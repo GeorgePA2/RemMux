@@ -14,6 +14,7 @@
 #include <netdb.h>
 #include <cstring>
 #include <ncurses.h>
+#include <sys/stat.h>
 #include <string>
 #include <vector>
 #include <fcntl.h>
@@ -32,56 +33,38 @@ typedef struct Protocol_Client
 {
   void(*procesare_ferestre_paralele)(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels);
   void(*procesare_ferestre_single)(vector<WINDOW*>& active_windows);
-  int(*procesare_cl)(int arc, char* argv[], int &status, WINDOW* wind);
-  void(*istoric_ferestre)(int chosen_window, string msg);
+  int(*procesare_cl)(int arc, char* argv[], int &status, WINDOW* wind, int current_window);
+  void(*istoric_ferestre)(int chosen_window, string& msg);
+  void(*curatenie_de_primavara)(void);
 }Protocol_Client;
 
 
 
 
-int procesare_client(int argc, char *argv[], int &connected, WINDOW* win);
-WINDOW* create_window (int height, int width, int y, int x);
+
+
 // void my_print(WINDOW* win, int &y_coord, int &x_coord, const char* msg){
 //     mvwprintw(win, y_coord, x_coord, "%s", msg);
 //     y_coord++;
 //     wrefresh(win);
 // }
 
-void log_history(string &msg){
-  int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
-  if(fd==-1){
-    perror("EROARE LA DESCHIDEREA FISIERULUI!");
-  }
-  if(write(fd, msg.c_str(), msg.size())<=-1){
-    perror("EROARE LA TRIMITEREA MESAJULUI!!");
-  }
-  msg.clear();
-  close(fd);
-}
 
-void process_windows(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels){
-  if(active_windows.size()!=10){
-  WINDOW* new_window = create_window(getmaxy(stdscr), getmaxx(stdscr), 0, 0);
-  active_windows.push_back(new_window);
-  idlok(new_window, true);
-  //wbkgd(new_window, COLOR_PAIR(1));
-  keypad(new_window, true);
-  mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "Page %d", (int)active_windows.size());
-  wmove(new_window, 1, 1);
-  PANEL* new_pan = new_panel(new_window);
-  active_panels.push_back(new_pan);
-  update_panels();
-  doupdate();
-  }
-
-}
-
+void log_history(string &msg);
+int procesare_client(int argc, char *argv[], int &connected, WINDOW* win, int current_window);
+WINDOW* create_window (int height, int width, int y, int x);
+void process_windows(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels);
 void process_singlewindow(vector<WINDOW*>& active_windows);
+void window_history(int chosen_window, string& msg);
+void restore_window(WINDOW* win, int window_number);
+void cleanup();
 
 Protocol_Client My_Client{
   .procesare_ferestre_paralele = process_windows,
   .procesare_ferestre_single = process_singlewindow,
-  .procesare_cl = procesare_client
+  .procesare_cl = procesare_client,
+  .istoric_ferestre = window_history,
+  .curatenie_de_primavara = cleanup
 };
 
 int main (int argc, char *argv[])
@@ -96,13 +79,14 @@ int main (int argc, char *argv[])
   vector<PANEL*> panouri_active;
   string log_updates;
   char key='i';
+  My_Client.curatenie_de_primavara();
 
 
 
   //int current_option = 0;
   //int max_options = 2;
   //int do_loop = 1;  
-  vector<string> options = {"SIngle Window", "Multi Window"};
+  //vector<string> options = {"SIngle Window", "Multi Window"};
   //main menu
 
   // while(do_loop){
@@ -177,6 +161,7 @@ int main (int argc, char *argv[])
 
 My_Client.procesare_ferestre_single(ferestre_active);
 int current_window = 0;
+string msg;
 while(key != 'q'){
   //log_history(log_updates = "Am intrat in loop\n");
   //log_history(log_updates = "Acum alegem alta cheie...\n");
@@ -187,12 +172,13 @@ while(key != 'q'){
   case 10:
   echo();
   while(true){
-  log_history(log_updates = "Clintul tasteaza\n");
-  if(My_Client.procesare_cl(argc, argv, connected, ferestre_active[current_window])!=1){
+  log_history(log_updates = "Clientul tasteaza\n");
+  if(My_Client.procesare_cl(argc, argv, connected, ferestre_active[current_window], current_window)!=1){
     log_history(log_updates = "A avut loc o eroare!\n");
     break;
    };
   wprintw(ferestre_active[current_window],"[Client] Do you want continue? y/n\n");
+  My_Client.istoric_ferestre(current_window, msg = "[Client] Do you want continue? y/n\n");
   wrefresh(ferestre_active[current_window]);
   while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
     noecho();
@@ -227,21 +213,41 @@ while(key != 'q'){
     break;
   }
 }
+  My_Client.curatenie_de_primavara();
   endwin();
 }
 
-int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
+void log_history(string &msg){
+  int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(fd==-1){
+    perror("EROARE LA DESCHIDEREA FISIERULUI!");
+    return;
+  }
+  if(write(fd, msg.c_str(), msg.size())<=-1){
+    return;
+  }
+  msg.clear();
+  close(fd);
+}
+
+int procesare_client(int argc, char *argv[], int &connected, WINDOW* win, int current_window){
   int sd;			// descriptorul de socket
   struct sockaddr_in server;	// structura folosita pentru conectare 
   int x_coord, y_coord;
   int nr=0;
+  string msg;
   char buf[4096];
 
   /* exista toate argumentele in linia de comanda? */
   if (argc != 3)
     {
-      wprintw(win, "Sintaxa: %s <adresa_server> <port>\n", argv[0]);
-      getch();
+      string argv_zero;
+      argv_zero.assign(argv[0], argv[0] + strlen(argv[0]));
+      msg = "Sintaxa: " + argv_zero  + "<adresa_server> <port>\n";
+      argv_zero.clear();
+      My_Client.istoric_ferestre(current_window, msg);
+      wprintw(win, "%s", msg.c_str());
+      wgetch(win);
       return -1;
     }
 
@@ -251,6 +257,8 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
   /* cream socketul */
   if ((sd = socket (AF_INET, SOCK_STREAM, 0)) == -1)
     {
+      msg = "Eroare la socket().\n";
+      My_Client.istoric_ferestre(current_window, msg);
       perror ("Eroare la socket().\n");
       return errno;
     }
@@ -268,12 +276,15 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
     {
       wprintw(win, "[client]Eroare la connect().\n");
       refresh();
-      for(int i=5;i>=0;i--){
+      int i;
+      for(i=5;i>=0;i--){
         getyx(win, y_coord, x_coord);
         mvwprintw (win, y_coord, x_coord, "Window will automatically close in %d seconds...\n", i);
         refresh();
         sleep(1);
         }
+        msg = "Window will automatically close in" + to_string(i) + "seconds...\n";
+        My_Client.istoric_ferestre(current_window, msg);
 
       perror("");
       
@@ -284,15 +295,22 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
 
   keypad(stdscr, TRUE);
   if(connected==0){
-  wprintw(win, "[Server] V-ati connectat cu succes!\n");
-  wrefresh(win);
-  connected = 1;
+    msg = "[Server] V-ati connectat cu succes!\n";
+    My_Client.istoric_ferestre(current_window, msg);
+    wprintw(win, "[Server] V-ati connectat cu succes!\n");
+    wrefresh(win);
+    connected = 1;
   }
 
 
   wprintw(win, "[client]Introduceti o comanda: ");
+  msg = "[client]Introduceti o comanda: ";
+  My_Client.istoric_ferestre(current_window, msg);
   wrefresh(win);
   wgetstr(win, buf);
+  msg = buf;
+  msg = msg + "\n";
+  My_Client.istoric_ferestre(current_window, msg);
   //scanf("%d",&nr);
   
   // mvprintw(y_coord, x_coord, "[client] Am citit %s\n",buf);
@@ -303,12 +321,14 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
   if (write (sd,&nr,sizeof(int)) <= 0)
     {
       perror ("[client]Eroare la write() spre server.\n");
+      log_history(msg = "[client]Eroare la write() spre server.\n");
       return errno;
     }
 
   if (write (sd, buf, nr) <= 0)
     {
       perror ("[client]Eroare la write() spre server.\n");
+      log_history(msg = "[client]Eroare la write() spre server.\n");
       return errno;
     }
 
@@ -316,10 +336,12 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
   if (read (sd, &nr,sizeof(int)) < 0)
     {
       perror ("[client]Eroare la read() de la server.\n");
+      log_history(msg = "[client]Eroare la read() de la server.\n");
       return errno;
     }
   else{
-    wprintw (win, "[Server]%d biti: \n",nr);
+    msg = "[Server]" + to_string(nr) + "biti\n";
+    log_history(msg);
   }
 
   char raspuns[nr+1];
@@ -327,12 +349,18 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win){
   if (read (sd, raspuns,nr) < 0)
     {
       perror ("[client]Eroare la read() de la server.\n");
+      log_history(msg = "[client]Eroare la read() de la server.\n");
       return errno;
     }
   raspuns[nr] = '\0';
 
   /* afisam mesajul primit */
   wprintw (win,"[Server]%s\n", raspuns);
+  string temp = raspuns;
+  msg = "[Server] " + temp + " \n";
+  temp.clear();
+  My_Client.istoric_ferestre(current_window, msg);
+  log_history(msg);
   wrefresh(win);
 
   /* inchidem conexiunea, am terminat */
@@ -345,6 +373,22 @@ WINDOW* create_window (int height, int width, int y, int x){
   box(new_window, 0, 0);
   wrefresh(new_window);
   return new_window;
+}
+
+void process_windows(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels){
+  if(active_windows.size()!=10){
+  WINDOW* new_window = create_window(getmaxy(stdscr), getmaxx(stdscr), 0, 0);
+  active_windows.push_back(new_window);
+  idlok(new_window, true);
+  //wbkgd(new_window, COLOR_PAIR(1));
+  keypad(new_window, true);
+  mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "Page %d", (int)active_windows.size());
+  wmove(new_window, 1, 1);
+  PANEL* new_pan = new_panel(new_window);
+  active_panels.push_back(new_pan);
+  update_panels();
+  doupdate();
+  }
 }
 
 void process_singlewindow(vector<WINDOW*>& active_windows){
@@ -363,9 +407,11 @@ void process_singlewindow(vector<WINDOW*>& active_windows){
     scrollok(new_window, true);
     //wbkgd(new_window, COLOR_PAIR(1));
     keypad(new_window, true);
-    mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
+    //mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
     wmove(new_window, 1, 1);
     wprintw(new_window, "Press Enter to start typing, + to create a new window or tab to switch between windows!");
+    logs =  "Press Enter to start typing, + to create a new window or tab to switch between windows!";
+    My_Client.istoric_ferestre((int)active_windows.size()-1, logs);
     wrefresh(new_window);
     log_history(logs = "Avem " + to_string((int)active_windows.size()) + " ferestre active!\n");
   }
@@ -387,16 +433,84 @@ void process_singlewindow(vector<WINDOW*>& active_windows){
     scrollok(new_window, true);
     //wbkgd(new_window, COLOR_PAIR(1));
     keypad(new_window, true);
-    mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
+    //mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
     wmove(new_window, 1, 1);
     if((active_windows.size()-2)%2==0){
+    wclear(active_windows[active_windows.size()-2]);
     wresize(active_windows[active_windows.size()-2], maxy_win, maxx_win/2);
+    wmove(active_windows[active_windows.size()-2], 1, 1);
+    restore_window(active_windows[active_windows.size()-2], active_windows.size()-2);
     }
     else{
+      wclear(active_windows[active_windows.size()-2]);
+      wmove(active_windows[active_windows.size()-2], 1, 1);
       wresize(active_windows[active_windows.size()-2], maxy_win/2, maxx_win);
+      restore_window(active_windows[active_windows.size()-2], active_windows.size()-2);
+     
     }
     box(active_windows[active_windows.size()-2], 0, 0);
     wrefresh(active_windows[active_windows.size()-2]);
   }
 
+}
+
+
+void window_history(int chosen_window, string& msg){
+  string nume_fisier = "./Client_logs/window" + to_string(chosen_window);
+  string toerrishuman;
+  int fd = open(nume_fisier.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(fd==-1){
+    perror("ERORARE LA CITIREA/CREEREA FISIERULUI!");
+    log_history(toerrishuman = "A avut loc o eroare la creerea fisierului window" + to_string(chosen_window)+"\n");
+    return;
+  }
+  if(write(fd, msg.c_str(), msg.size())==-1){
+    perror("EROARE LA SCRIEREA PE FISIER!");
+    log_history(toerrishuman = "A avut loc o eroare la scrierea pe fisierul window" + to_string(chosen_window)+"\n");
+    return;
+  }
+  msg.clear();
+  nume_fisier.clear();
+  toerrishuman.clear();
+  close(fd);
+}
+
+void restore_window(WINDOW* win, int window_number){
+  string istoric_fereastra = "./Client_logs/window" + to_string(window_number);
+  string err;
+  struct stat stbuf;
+  int fd = open(istoric_fereastra.c_str(), O_RDONLY);
+  if(fd==-1){
+    perror("ERORARE LA DESCHIDEREA FISIERULUI!");
+    log_history(err= "A avut loc o eroare la deschiderea fisierului window" + to_string(window_number)+"\n");
+    return;
+  }
+  if(lstat(istoric_fereastra.c_str(), &stbuf)==-1){
+    perror("EROARE LA lstat!");
+    log_history(err = "EROARE LA lstat!");
+    return;
+  }
+
+  int file_size = stbuf.st_size;
+  char istory[file_size+1];
+
+  if(read(fd, istory, file_size)==-1){
+    perror("EROARE LA CITIRE DIN FISIER!");
+    log_history(err = "EROARE LA CITIREA DIN FISIERUL window"+to_string(window_number)+"\n");
+    return;
+  }
+  istory[file_size] = '\0';
+  wprintw(win, "%s", istory);
+  istoric_fereastra.clear();
+  err.clear();
+  close(fd);
+  wrefresh(win);
+}
+
+void cleanup(){
+  string file_history;
+  for(int i=0;i<=10;i++){
+    file_history = "./Client_logs/window" + to_string(i);
+    remove(file_history.c_str());
+  }
 }
