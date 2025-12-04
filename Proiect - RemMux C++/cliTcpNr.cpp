@@ -30,8 +30,10 @@ int port;
 
 typedef struct Protocol_Client
 {
-  void(*procesare_ferestre)(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels);
+  void(*procesare_ferestre_paralele)(vector<WINDOW*>& active_windows, vector<PANEL*>& active_panels);
+  void(*procesare_ferestre_single)(vector<WINDOW*>& active_windows);
   int(*procesare_cl)(int arc, char* argv[], int &status, WINDOW* wind);
+  void(*istoric_ferestre)(int chosen_window, string msg);
 }Protocol_Client;
 
 
@@ -74,8 +76,11 @@ void process_windows(vector<WINDOW*>& active_windows, vector<PANEL*>& active_pan
 
 }
 
+void process_singlewindow(vector<WINDOW*>& active_windows);
+
 Protocol_Client My_Client{
-  .procesare_ferestre = process_windows,
+  .procesare_ferestre_paralele = process_windows,
+  .procesare_ferestre_single = process_singlewindow,
   .procesare_cl = procesare_client
 };
 
@@ -90,56 +95,137 @@ int main (int argc, char *argv[])
   vector<WINDOW*> ferestre_active;
   vector<PANEL*> panouri_active;
   string log_updates;
-  process_windows(ferestre_active, panouri_active);
-  int current_window = 0;
-  char key='i';  
-  while(key != 'q'){
-    //log_history(log_updates = "Am intrat in loop\n");
-    //log_history(log_updates = "Acum alegem alta cheie...\n");
+  char key='i';
+
+
+
+  //int current_option = 0;
+  //int max_options = 2;
+  //int do_loop = 1;  
+  vector<string> options = {"SIngle Window", "Multi Window"};
+  //main menu
+
+  // while(do_loop){
+  // mvprintw(getmaxy(stdscr)/2, getmaxx(stdscr)/2, "Bine ati venit pe programul meu! Va rugam selectati modul de operare preferat\n");
+  //   switch (key)
+  //   {
+  //     case 10:
+  //     do_loop = 0;
+  //     break;
+  //     case '\t':
+  //     if(current_option+1>=max_options){
+  //       current_option = 0;
+  //     }
+  //     else{
+  //       current_option++;
+  //     }
+
+  //   }
+  // }
+
+
+//   process_windows(ferestre_active, panouri_active);
+//   int current_window = 0;
+//   while(key != 'q'){
+//     //log_history(log_updates = "Am intrat in loop\n");
+//     //log_history(log_updates = "Acum alegem alta cheie...\n");
+//     key = wgetch(ferestre_active[current_window]);
+//     switch (key)
+//     {
+//     case 10:
+
+//     log_history(log_updates = "Clintul tasteaza\n");
+
+//     if(My_Client.procesare_cl(argc, argv, connected, ferestre_active[current_window])!=1){
+//       log_history(log_updates = "A avut loc o eroare!\n");
+//       break;
+//      };
+//     wprintw(ferestre_active[current_window],"[Client] Do you want continue? y/n\n");
+//     wrefresh(ferestre_active[current_window]);
+//     while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
+//       noecho();
+//       key = wgetch(ferestre_active[current_window]);
+//       echo();
+//     }
+//     if((key=='n') || (key=='N')){
+//       log_history(log_updates = "Am ales sa nu mai continui!\n");
+//       break;
+//     }
+    
+//       break;
+//     case '\t':
+//     log_history(log_updates = "Schimbam fereastra!\n");
+//       if(current_window>(int)panouri_active.size()-2){
+//         current_window = 0;
+//       }
+//       else{
+//         current_window++;
+//       }
+//       top_panel(panouri_active[current_window]);
+//       wrefresh(ferestre_active[current_window]);
+//       break;
+//     case '=':
+//       process_windows(ferestre_active, panouri_active);
+//       current_window = ferestre_active.size()-1;
+//       log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string((int)ferestre_active.size()) + "\n");
+//       break;
+    
+//     default:
+//       break;
+//     }
+// }
+
+My_Client.procesare_ferestre_single(ferestre_active);
+int current_window = 0;
+while(key != 'q'){
+  //log_history(log_updates = "Am intrat in loop\n");
+  //log_history(log_updates = "Acum alegem alta cheie...\n");
+  noecho();
+  key = wgetch(ferestre_active[current_window]);
+  switch (key)
+  {
+  case 10:
+  echo();
+  while(true){
+  log_history(log_updates = "Clintul tasteaza\n");
+  if(My_Client.procesare_cl(argc, argv, connected, ferestre_active[current_window])!=1){
+    log_history(log_updates = "A avut loc o eroare!\n");
+    break;
+   };
+  wprintw(ferestre_active[current_window],"[Client] Do you want continue? y/n\n");
+  wrefresh(ferestre_active[current_window]);
+  while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
+    noecho();
     key = wgetch(ferestre_active[current_window]);
-    switch (key)
-    {
-    case 10:
+    echo();
+  }
+  if((key=='n') || (key=='N')){
+    log_history(log_updates = "Am ales sa nu mai continui!\n");
+    break;
+  }
+  } 
+  break;
 
-    log_history(log_updates = "Clintul tasteaza\n");
 
-    if(My_Client.procesare_cl(argc, argv, connected, ferestre_active[current_window])!=1){
-      log_history(log_updates = "A avut loc o eroare!\n");
-      break;
-     };
-    wprintw(ferestre_active[current_window],"[Client] Do you want continue? y/n\n");
+  case '\t':
+  log_history(log_updates = "Schimbam fereastra!\n");
+    if(current_window>(int)ferestre_active.size()-2){
+      current_window = 0;
+    }
+    else{
+      current_window++;
+    }
     wrefresh(ferestre_active[current_window]);
-    while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
-      noecho();
-      key = wgetch(ferestre_active[current_window]);
-      echo();
-    }
-    if((key=='n') || (key=='N')){
-      log_history(log_updates = "Am ales sa nu mai continui!\n");
-      break;
-    }
-    
-      break;
-    case '\t':
-    log_history(log_updates = "Schimbam fereastra!\n");
-      if(current_window>(int)panouri_active.size()-2){
-        current_window = 0;
-      }
-      else{
-        current_window++;
-      }
-      top_panel(panouri_active[current_window]);
-      wrefresh(ferestre_active[current_window]);
-      break;
-    case '=':
-      process_windows(ferestre_active, panouri_active);
-      current_window = ferestre_active.size()-1;
-      log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string((int)ferestre_active.size()) + "\n");
-      break;
-    
-    default:
-      break;
-    }
+    break;
+  case '=':
+    My_Client.procesare_ferestre_single(ferestre_active);
+    current_window = ferestre_active.size()-1;
+    log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string((int)ferestre_active.size()) + "\n");
+    break;
+  
+  default:
+    break;
+  }
 }
   endwin();
 }
@@ -259,4 +345,58 @@ WINDOW* create_window (int height, int width, int y, int x){
   box(new_window, 0, 0);
   wrefresh(new_window);
   return new_window;
+}
+
+void process_singlewindow(vector<WINDOW*>& active_windows){
+  int maxx_win, maxy_win, init_x, init_y;
+  WINDOW* new_window;
+  string logs;
+  if(active_windows.size()==0){
+
+    maxx_win = getmaxx(stdscr);
+    maxy_win = getmaxy(stdscr);
+    init_x = getbegx(stdscr);
+    init_y = getbegy(stdscr);
+    new_window = create_window(maxy_win, maxx_win, init_y, init_x);
+    active_windows.push_back(new_window);
+    idlok(new_window, true);
+    scrollok(new_window, true);
+    //wbkgd(new_window, COLOR_PAIR(1));
+    keypad(new_window, true);
+    mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
+    wmove(new_window, 1, 1);
+    wprintw(new_window, "Press Enter to start typing, + to create a new window or tab to switch between windows!");
+    wrefresh(new_window);
+    log_history(logs = "Avem " + to_string((int)active_windows.size()) + " ferestre active!\n");
+  }
+  else if(active_windows.size()!=6){
+    log_history(logs = "Avem " + to_string((int)active_windows.size()) + " ferestre active!\n");
+    maxx_win = getmaxx(active_windows[active_windows.size()-1]);
+    maxy_win = getmaxy(active_windows[active_windows.size()-1]);
+    init_x = getbegx(active_windows[active_windows.size()-1]);
+    init_y = getbegy(active_windows[active_windows.size()-1]);
+    
+    if(active_windows.size()%2==0){
+    new_window = create_window(maxy_win/2, maxx_win, init_y+maxy_win/2, init_x);
+    }
+    else{
+      new_window = create_window(maxy_win, maxx_win/2, init_y, init_x+maxx_win/2);
+    }
+    active_windows.push_back(new_window);
+    idlok(new_window, true);
+    scrollok(new_window, true);
+    //wbkgd(new_window, COLOR_PAIR(1));
+    keypad(new_window, true);
+    mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
+    wmove(new_window, 1, 1);
+    if((active_windows.size()-2)%2==0){
+    wresize(active_windows[active_windows.size()-2], maxy_win, maxx_win/2);
+    }
+    else{
+      wresize(active_windows[active_windows.size()-2], maxy_win/2, maxx_win);
+    }
+    box(active_windows[active_windows.size()-2], 0, 0);
+    wrefresh(active_windows[active_windows.size()-2]);
+  }
+
 }
