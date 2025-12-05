@@ -189,6 +189,9 @@ while(key != 'q'){
     log_history(log_updates = "Am ales sa nu mai continui!\n");
     break;
   }
+  else{
+    key='i';
+  }
   } 
   break;
 
@@ -307,15 +310,10 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win, int cu
   msg = "[client]Introduceti o comanda: ";
   My_Client.istoric_ferestre(current_window, msg);
   wrefresh(win);
-  wgetstr(win, buf);
+  wgetnstr(win, buf, 4096);
   msg = buf;
   msg = msg + "\n";
   My_Client.istoric_ferestre(current_window, msg);
-  //scanf("%d",&nr);
-  
-  // mvprintw(y_coord, x_coord, "[client] Am citit %s\n",buf);
-  // y_coord++;
-  // refresh();
   
   nr = strlen(buf)+1;
   if (write (sd,&nr,sizeof(int)) <= 0)
@@ -371,7 +369,9 @@ int procesare_client(int argc, char *argv[], int &connected, WINDOW* win, int cu
 WINDOW* create_window (int height, int width, int y, int x){
   WINDOW* new_window = newwin(height, width, y, x);
   box(new_window, 0, 0);
+  //WINDOW* innernew_window = newwin(height-1, width-1, y+1, x+1);
   wrefresh(new_window);
+  //wrefresh(innernew_window);
   return new_window;
 }
 
@@ -407,7 +407,7 @@ void process_singlewindow(vector<WINDOW*>& active_windows){
     scrollok(new_window, true);
     //wbkgd(new_window, COLOR_PAIR(1));
     keypad(new_window, true);
-    //mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
+    mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
     wmove(new_window, 1, 1);
     wprintw(new_window, "Press Enter to start typing, + to create a new window or tab to switch between windows!");
     logs =  "Press Enter to start typing, + to create a new window or tab to switch between windows!";
@@ -416,6 +416,7 @@ void process_singlewindow(vector<WINDOW*>& active_windows){
     log_history(logs = "Avem " + to_string((int)active_windows.size()) + " ferestre active!\n");
   }
   else if(active_windows.size()!=6){
+    
     log_history(logs = "Avem " + to_string((int)active_windows.size()) + " ferestre active!\n");
     maxx_win = getmaxx(active_windows[active_windows.size()-1]);
     maxy_win = getmaxy(active_windows[active_windows.size()-1]);
@@ -429,25 +430,42 @@ void process_singlewindow(vector<WINDOW*>& active_windows){
       new_window = create_window(maxy_win, maxx_win/2, init_y, init_x+maxx_win/2);
     }
     active_windows.push_back(new_window);
+    
     idlok(new_window, true);
     scrollok(new_window, true);
     //wbkgd(new_window, COLOR_PAIR(1));
     keypad(new_window, true);
     //mvwprintw(new_window, getmaxy(new_window)-1, getmaxx(new_window)/2, "%d", (int)active_windows.size());
     wmove(new_window, 1, 1);
+    My_Client.istoric_ferestre((int)active_windows.size()-1, logs="");
+
+
     if((active_windows.size()-2)%2==0){
+    // wborder(active_windows[active_windows.size()-2], ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
+    werase(active_windows[active_windows.size()-2]);
     wclear(active_windows[active_windows.size()-2]);
+    touchwin((active_windows[active_windows.size()-2]));
+    wrefresh(active_windows[active_windows.size()-2]);
     wresize(active_windows[active_windows.size()-2], maxy_win, maxx_win/2);
     wmove(active_windows[active_windows.size()-2], 1, 1);
     restore_window(active_windows[active_windows.size()-2], active_windows.size()-2);
+    //mvwprintw(active_windows[active_windows.size()-2], getmaxy(active_windows[active_windows.size()-2])-1, getmaxx(active_windows[active_windows.size()-2])/2, "%d", (int)active_windows.size()-1);
+    //wmove(new_window, 1, 1);
     }
     else{
+     // wborder(active_windows[active_windows.size()-2], ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
+      werase(active_windows[active_windows.size()-2]);
       wclear(active_windows[active_windows.size()-2]);
+      touchwin((active_windows[active_windows.size()-2]));
+      wrefresh(active_windows[active_windows.size()-2]);
       wmove(active_windows[active_windows.size()-2], 1, 1);
       wresize(active_windows[active_windows.size()-2], maxy_win/2, maxx_win);
       restore_window(active_windows[active_windows.size()-2], active_windows.size()-2);
+      //mvwprintw(active_windows[active_windows.size()-2], getmaxy(active_windows[active_windows.size()-2])-1, getmaxx(active_windows[active_windows.size()-2])/2, "%d", (int)active_windows.size()-1);
+      //wmove(new_window, 1, 1);
      
     }
+    box(new_window, 0, 0);
     box(active_windows[active_windows.size()-2], 0, 0);
     wrefresh(active_windows[active_windows.size()-2]);
   }

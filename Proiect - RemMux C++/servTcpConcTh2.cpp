@@ -227,23 +227,17 @@ void raspunde(void *arg)
 }
 
 int comanda_valida(char* cmd){
-  char* cmd_temp = new char[strlen(cmd)+1];
-  strcpy(cmd_temp, cmd);
-  cmd_temp[strlen(cmd)]='\0';
-
-  char cmd_path[256];
-  strcpy(cmd_path, "/usr/bin/");
-
-  if(strtok(cmd_temp, " ")==NULL){
-    strcat(cmd_path, cmd);
+  string command_name = cmd;
+  for(int i=0;i<(int)command_name.size(); i++){
+    if(command_name[i]==' '){
+      command_name.erase(i);
+    }
   }
-  else{
-    strcat(cmd_path, cmd_temp);
-  }
+  string cmd_path = "/usr/bin/" + command_name;
 
-  printf("cmd_path = %s\n", cmd_path);
+  printf("cmd_path = %s\n", cmd_path.c_str());
 
-  int fd = open(cmd_path, O_RDONLY);
+  int fd = open(cmd_path.c_str(), O_RDONLY);
 
   if(fd<-0){
     return 0;
