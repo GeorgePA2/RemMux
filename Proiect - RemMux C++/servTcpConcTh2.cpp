@@ -178,7 +178,7 @@ static void *treat(void * arg)
 		pthread_detach(pthread_self());		
 		raspunde((struct thData*)arg);
 		/* am terminat cu acest client, inchidem conexiunea */
-		close ((intptr_t)arg);
+		close (tdL.cl);
     free(arg);
 		return(NULL);	
   		
@@ -198,7 +198,7 @@ void raspunde(void *arg)
 			}
 	
 	printf ("[Thread %d]Marimea mesajului a fost receptionata...%d\n",tdL.idThread, nr);
-  if((nr<=-1) || (nr>10000)){
+  if((nr<=0) || (nr>10000)){
     printf("Something unexpected happened...");
     MyProtocol.returneaza(arg, 2);
   }
@@ -340,23 +340,7 @@ void return2cl(void* arg, int is_err){
   }
   
   else if(is_err==2){
-      char mesaj_de_eroare[] = "Mesajul tau nu poate fi acceptat de catre acest server!";
-      sizeofmsg = strlen(mesaj_de_eroare)-1;
-      
-      if(write(tdL.cl, &sizeofmsg, sizeof(int))<=0){
-        printf("[Thread %d] ",tdL.idThread);
-        perror ("[Thread]Eroare la write() catre client.\n");
-      }
-      else{
-        printf ("[Thread %d]Numarul de biti %d a fost trasmis cu succes.\n",tdL.idThread, sizeofmsg);	
-      }
-      if(write(tdL.cl, mesaj_de_eroare, sizeofmsg)<=0){
-        printf("[Thread %d] ",tdL.idThread);
-        perror ("[Thread]Eroare la write() catre client.\n");
-      }
-      else{
-        printf ("[Thread %d]Mesajul : %s de eroare transmis cu succes!.\n",tdL.idThread, mesaj_de_eroare);	
-      }
+      perror("SOMETHING UNEXPECTED HAPPENED!");
     }
   
 
