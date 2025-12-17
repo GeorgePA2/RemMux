@@ -33,8 +33,8 @@ my_windows::my_windows()
     this->current_window = 0;
     this->max_size = 6;
     wmove(innernew_window, 0, 0);
-    wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!");
-    string logs =  "Press Enter to start typing, + to create a new window or tab to switch between windows!";
+    wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n");
+    string logs =  "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n";
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");

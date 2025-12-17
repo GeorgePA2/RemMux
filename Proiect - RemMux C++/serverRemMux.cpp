@@ -1,0 +1,471 @@
+
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <cerrno>
+#include <unistd.h>
+#include <stdio.h>
+#include <cstring>
+#include <stdlib.h>
+#include <signal.h>
+#include <vector>
+#include <string>
+#include <pthread.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+
+
+#define PORT 2908
+using namespace std;
+
+extern int errno;
+
+typedef struct thData{
+	int idThread; 
+	int cl; 
+}thData;
+
+typedef struct info_operatii
+{
+  string nume;
+  int operatia;
+  int pozitie;
+}info_operatii;
+
+typedef struct Protocol
+{
+  int(*valideaza_comanda)(char* comanda);
+  info_operatii(*tipul_operatiei)(const char* comanda);
+  void(*executa)(const char* comanda, void* arg);
+  void(*returneaza)(void* arg, int code);
+}Protocol;
+
+
+static void *treat(void *); 
+void raspunde(void *);
+
+int find_sep(const char* string_seq, const char* sep){
+  
+  int i = 0;
+  int k = 0;
+
+  while(i<(int)strlen(string_seq)){
+    printf("c: %c\n", string_seq[i]);
+    if(string_seq[i]==sep[k]){
+    printf("realizam compararea intre %c si %c \n", string_seq[i], sep[k]);
+    printf("string_seq[%d+%d+1] si sep[%d+1], adica %c si %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
+      while(string_seq[i+k+1]==sep[k+1]){
+      	printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
+        k++;
+        printf("%d\n", k);
+      }
+      printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
+      if(k==((int)strlen(sep))-1){
+
+        return i;
+      }
+      else{
+         i = i+k;
+         k=0;
+      }
+    }
+    i++;
+  }
+
+  return -1;
+}
+
+
+int comanda_valida(char* cmd);
+info_operatii op_type(const char* cmd);
+void exec_cmd(const char* cmd, void* arg);
+void return2cl(void* arg, int cod);
+void exec_sg_cmd(const char* cmd, string filename);
+void pregateste_comanda(const char* cmd, char** &vector_de_comenzi);
+
+
+
+
+Protocol MyProtocol{
+  .valideaza_comanda = comanda_valida,
+  .tipul_operatiei = op_type,
+  .executa = exec_cmd,
+  .returneaza = return2cl
+};
+
+int main ()
+{
+  struct sockaddr_in server;	
+  struct sockaddr_in from;	
+  int sd;		
+  pthread_t th[100];   
+	int i=0;
+  
+
+
+  if ((sd = socket (AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+      perror ("[server]Eroare la socket().\n");
+      return errno;
+    }
+
+  int on=1;
+  setsockopt(sd,SOL_SOCKET,SO_REUSEADDR,&on,sizeof(on));
+
+  bzero (&server, sizeof (server));
+  bzero (&from, sizeof (from));
+
+    server.sin_family = AF_INET;	
+
+    server.sin_addr.s_addr = htonl (INADDR_ANY);
+
+    server.sin_port = htons (PORT);
+  
+
+  if (bind (sd, (struct sockaddr *) &server, sizeof (struct sockaddr)) == -1)
+    {
+      perror ("[server]Eroare la bind().\n");
+      return errno;
+    }
+
+
+  if (listen (sd, 2) == -1)
+    {
+      perror ("[server]Eroare la listen().\n");
+      return errno;
+    }
+
+  while (1)
+    {
+      int client;
+      thData * td; 
+      socklen_t length = sizeof (from);
+
+      printf ("[server]Asteptam la portul %d...\n",PORT);
+      fflush (stdout);
+
+
+      if ( (client = accept (sd, (struct sockaddr *) &from, &length)) < 0)
+	{
+	  perror ("[server]Eroare la accept().\n");
+	  continue;
+	}
+	
+
+
+	td=(struct thData*)malloc(sizeof(struct thData));	
+	td->idThread=i++;
+	td->cl=client;
+
+	pthread_create(&th[i], NULL, &treat, td);	      
+				
+	}
+};				
+static void *treat(void * arg)
+{		
+		struct thData tdL; 
+		tdL= *((struct thData*)arg);	
+		printf ("[thread]- %d - Asteptam mesajul...\n", tdL.idThread);
+		fflush (stdout);		 
+		pthread_detach(pthread_self());		
+		raspunde((struct thData*)arg);
+
+		close (tdL.cl);
+    free(arg);
+		return(NULL);	
+  		
+};
+
+
+void raspunde(void *arg)
+{
+  int nr;
+	struct thData tdL; 
+	tdL= *((struct thData*)arg);
+	if (read (tdL.cl, &nr,sizeof(int)) <= 0)
+			{
+			  printf("[Thread %d]\n",tdL.idThread);
+			  perror ("Eroare la read() de la client.\n");
+			
+			}
+	
+  if((nr<=0) || (nr>10000)){
+    printf("Something unexpected happened...");
+    return;
+  }
+  printf ("[Thread %d]Marimea mesajului a fost receptionata...%d\n",tdL.idThread, nr);
+  char comanda_primita[nr+1];
+  if(read(tdL.cl, comanda_primita, sizeof(comanda_primita))<=0){
+    printf("[Thread %d]\n",tdL.idThread);
+    perror ("Eroare la read() de la client.\n");
+  }
+  printf ("[Thread %d]Comanda a fost receptionata...%s\n",tdL.idThread, comanda_primita);
+
+  printf("[Thread %d]Trimitem mesajul inapoi...%d\n",tdL.idThread, nr);
+  if(MyProtocol.valideaza_comanda(comanda_primita)==1){
+    printf("Comanda a fost validata! \n");
+    MyProtocol.executa(comanda_primita, arg);
+    printf("Comanda a fost executata! \n");
+    MyProtocol.returneaza(arg, 0);
+  }
+  else{
+    printf("Comanda NU a fost validata! \n");
+    MyProtocol.returneaza(arg, 1);
+  }
+
+
+		    
+
+}
+
+int comanda_valida(char* cmd){
+  string command_name = cmd;
+  for(int i=0;i<(int)command_name.size(); i++){
+    if(command_name[i]==' '){
+      command_name.erase(i);
+    }
+  }
+  string cmd_path = "/usr/bin/" + command_name;
+
+  printf("cmd_path = %s\n", cmd_path.c_str());
+
+  int fd = open(cmd_path.c_str(), O_RDONLY);
+
+  if(fd<-0){
+    return 0;
+  }
+  else{
+    close(fd);
+    return 1;
+  }
+}
+
+info_operatii op_type(const char* cmd){
+  vector<string> separatori = {";", " && ", " || ", " | ", "2>", "<", ">"};
+  int pos;
+  int i = 0;
+  for(const auto& x : separatori){
+    pos=find_sep(cmd, x.c_str());
+    if(pos>-1){
+      info_operatii result{
+        .nume = x,
+        .operatia = i,
+        .pozitie = pos
+      };
+      return result;
+    }
+    i++;
+  }
+  separatori.clear();
+  info_operatii result{
+    .nume = "N/A",
+    .operatia = -1,
+    .pozitie = -1
+  };
+  return result;
+}
+
+void exec_cmd(const char* cmd, void* arg){
+  struct thData tdL; 
+	tdL= *((struct thData*)arg);
+  string filename = "./Files/temp" + to_string(tdL.idThread);
+  int file_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(file_fd==-1){
+    perror("EROARE LA DESCHIDEREA/CREEREA FILEI!");
+  }
+
+  if(MyProtocol.tipul_operatiei(cmd).pozitie==-1){
+    exec_sg_cmd(cmd, filename);
+  }
+  else{
+
+    int nr = strlen(cmd);
+
+    if((write(file_fd, &nr, sizeof(int)))==-1){
+      perror("EROARE LA TRIMITEREA BITILOR!");
+    }
+    if((write(file_fd, cmd, strlen(cmd)))<=-1){
+      perror("EROARE LA TRIMITEREA RASPUNSULUI!");
+    }
+  }
+  close(file_fd);
+}
+
+
+void return2cl(void* arg, int is_err){
+	struct thData tdL; 
+	tdL= *((struct thData*)arg);
+  string filename = "./Files/temp" + to_string(tdL.idThread);
+  int sizeofmsg;
+
+  if(is_err==1){
+    char mesaj_de_eroare[] = "Eroare! Comanda inexistenta!";
+    sizeofmsg = strlen(mesaj_de_eroare)-1;
+    
+    if(write(tdL.cl, &sizeofmsg, sizeof(int))<=0){
+      printf("[Thread %d] ",tdL.idThread);
+      perror ("[Thread]Eroare la write() catre client.\n");
+    }
+    else{
+      printf ("[Thread %d]Numarul de biti %d a fost trasmis cu succes.\n",tdL.idThread, sizeofmsg);	
+    }
+    if(write(tdL.cl, mesaj_de_eroare, sizeofmsg)<=0){
+      printf("[Thread %d] ",tdL.idThread);
+      perror ("[Thread]Eroare la write() catre client.\n");
+    }
+    else{
+      printf ("[Thread %d]Mesajul : %s de eroare transmis cu succes!.\n",tdL.idThread, mesaj_de_eroare);	
+    }
+  }
+
+  else if(is_err==0){
+  int fd = open(filename.c_str(), O_RDONLY);
+  if(fd==-1){
+    perror("EROARE LA DESCHIDEREA FISIERULUI!");
+  }
+  if(read(fd, &sizeofmsg, sizeof(int))==-1){
+    perror("EROARE LA CITIRE!");
+  }
+  char msg[sizeofmsg];
+  if(read(fd, msg, sizeof(msg))==-1){
+    perror("EROARE LA CITIREA MESAJULUI!");
+  }
+	 if (write (tdL.cl, &sizeofmsg, sizeof(int)) <= 0)
+		{
+		 printf("[Thread %d] ",tdL.idThread);
+		 perror ("[Thread]Eroare la write() catre client.\n");
+		}
+	else{
+		printf ("[Thread %d]Numarul de biti %d a fost trasmis cu succes.\n",tdL.idThread, sizeofmsg);	
+    msg[sizeofmsg] = '\0';
+     if (write (tdL.cl, msg, sizeofmsg) <= 0)
+      {
+       printf("[Thread %d] ",tdL.idThread);
+       perror ("[Thread]Eroare la write() catre client.\n");
+      }
+    else{
+      printf ("[Thread %d]Mesajul %s a fost transmis cu success.\n",tdL.idThread, msg);	
+      close(fd);
+    }
+    }
+  }
+  
+  else if(is_err==2){
+      perror("SOMETHING UNEXPECTED HAPPENED!");
+    }
+  
+
+  remove(filename.c_str());
+}
+
+void exec_sg_cmd(const char* cmd, string filename){
+
+  pid_t executare_comanda;
+  string filename_temp = filename+"temp";
+  int file_fd = open(filename_temp.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(file_fd==-1){
+    perror("EROARE! FISIERUL TEMPORAR NU S-A PUTUT CREEA! GO BACK!");
+    return;
+  }
+
+  int fd = open(filename.c_str(), O_RDWR);
+  if(fd==-1){
+    perror("EROARE! FISIER INEXISTENT! GO BACK!");
+    return;
+  }
+
+
+  char** argumente;
+  pregateste_comanda(cmd, argumente);
+  string comanda = argumente[0];
+  string cale_absoluta = "/usr/bin/" + comanda;
+  comanda.clear();
+
+  int status = 0;
+  pid_t asteptare_fiu;
+
+  if((executare_comanda=fork())==-1){
+      perror("ERORARE LA CREEREA PROCESULUI!");
+  }
+  if(executare_comanda==0){
+    dup2(file_fd, 1); 
+    close(fd);
+    execv(cale_absoluta.c_str(), argumente);
+    perror("ERORARE LA EXECUTARE!");
+    exit(EXIT_FAILURE);
+  }
+  else
+  {   
+
+
+      asteptare_fiu = wait(&status);
+      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1");}
+
+      struct stat stbuf;
+      if(lstat(filename_temp.c_str(), &stbuf)==-1){
+        perror("ERORARE LA PRELUAREA DATELOR!");
+        exit(EXIT_FAILURE);
+      }
+
+      int file_size = stbuf.st_size;
+      char* temp = new char[file_size+1];
+      if(write(fd, &file_size, sizeof(file_size))<0){
+        perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
+        exit(EXIT_FAILURE);
+      }
+      if(lseek(file_fd, 0, SEEK_SET)==-1){
+        perror("EROARE LA SETAREA POZITIEI!");
+        exit(EXIT_FAILURE);
+      }
+      if(read(file_fd, temp, file_size)<0){
+        perror("EROARE LA CITIRE!!!");
+        exit(EXIT_FAILURE);
+      }
+      temp[file_size] = '\0';
+      printf("TEXTUL: %s \n DE DIMENSIUNE %d \n", temp, file_size);
+
+      if(write(fd, temp, file_size)<0){
+        perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
+        exit(EXIT_FAILURE);
+      }
+
+      for(int i = 0; argumente[i]!=nullptr;i++){
+          delete[] argumente[i];
+      }
+      delete[] argumente;
+      delete[] temp;
+      close(fd);
+      close(file_fd);
+      remove(filename_temp.c_str());
+  }
+
+
+}
+
+void pregateste_comanda(const char* cmd, char** &vector_de_comenzi){
+  vector<string> argumente;
+  int size = strlen(cmd);
+  char* temp = new char[size+1];
+  strcpy(temp, cmd);
+  temp[size] = '\0';
+
+  char * p = strtok(temp , " ");
+  while(p!=NULL){
+    string argument = p;
+    argumente.push_back(p);
+    p = strtok(NULL, " ");
+  }
+  delete[] temp;
+  vector_de_comenzi = new char*[argumente.size()+1];
+  int i = 0;
+  for(const auto &x : argumente){
+      vector_de_comenzi[i] = new char[argumente[i].size()+1];
+      strcpy(vector_de_comenzi[i], x.c_str());
+      i++;
+  }
+  vector_de_comenzi[i] = nullptr;
+  argumente.clear();
+  
+}

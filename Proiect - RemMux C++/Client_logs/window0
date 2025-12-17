@@ -1,2 +1,30 @@
-Press Enter to start typing, + to create a new window or tab to switch between windows![Server] V-ati connectat cu succes!
-[client]Introduceti o comanda: 
+Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!
+[Server] V-ati connectat cu succes!
+[client]Introduceti o comanda: oosfdpsdf
+[Server] Eroare! Comanda inexistenta 
+[Client] Do you want continue? y/n
+[client]Introduceti o comanda: ls
+[Server] ls 
+[Client] Do you want continue? y/n
+[client]Introduceti o comanda: ls
+[Server] Client_logs
+clientRemMux
+clientRemMux.cpp
+Files
+main.cpp
+My_Classes
+my_logs
+serverRemMux
+serverRemMux.cpp
+ 
+[Client] Do you want continue? y/n
+[client]Introduceti o comanda: pwd
+[Server] /home/georgepa2/Documents/Proiect - RemMux C++
+ 
+[Client] Do you want continue? y/n
+[client]Introduceti o comanda: ls | pwd
+[Server] [?2004h[?1049h[22;0;0t[1;24r(B[m[4l[?7h[39;49m[?1h=[?1h=[?25l[39;49m(B[m[H[2J[22;34H(B[0;7m[ Reading... ](B[m[22;33H(B[0;7m[ Read 0 lines ](B[m[H(B[0;7m  GNU nano 6.2                       newfile.txt                                [1;79H(B[m[23d(B[0;7m^G(B[m Help[14G(B[0;7m^O(B[m Write Out (B[0;7m^W(B[m Where Is  (B[0;7m^K(B[m Cut[53G(B[0;7m^T(B[m Execute   (B[0;7m^C(B[m Location[24d(B[0;7m^X(B[m Exit[14G(B[0;7m^R(B[m Read File (B[0;7m^\(B[m Replace   (B[0;7m^U(B[m Paste     (B[0;7m^J(B[m Justify   (B[0;7m^/(B[m Go To Line[2d[?12l[?25h 
+[Client] Do you want continue? y/n
+[client]Introduceti o comanda: ls -l | more
+[Server] ls -l | more 
+[Client] Do you want continue? y/n
