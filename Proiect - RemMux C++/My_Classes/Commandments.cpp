@@ -28,17 +28,21 @@ Commandments::Commandments(const char *cmd)
     info_operatii op_info = op_type(cmd, 0);
     int operatie = op_info.operatia;
     cmd_str = separa_comenzi(cmd, op_info.pozitie_init, op_info.pozitie_fin);
+    //printf("CMD1 este: %s \n", cmd_str.c_str());
     this->Commands.push_back(cmd_str);
-    this->Comenzi_separate.push_back(separate_inside(cmd));
+    this->Comenzi_separate.push_back(separate_inside(cmd_str));
     this->total_commands++;
+    //printf("pozitia de start %d \n elementul de pe pozitiea de start %c \n comanda este %s \n Operatia corespunzatoare : %d \n", op_info.pozitie_init, cmd[op_info.pozitie_init], cmd_str.c_str(), op_info.operatia);
     while (operatie!=-1)
     {
+
         op_info = op_type(cmd, op_info.pozitie_fin + op_info.nume.size());
         cmd_str = separa_comenzi(cmd, op_info.pozitie_init, op_info.pozitie_fin);
         this->Commands.push_back(cmd_str);
-        this->Comenzi_separate.push_back(separate_inside(cmd));
+        this->Comenzi_separate.push_back(separate_inside(cmd_str));
         this->total_commands++;
-        printf("pozitia de start %d \n elementul de pe pozitiea de start %c \n cmd2 este %s \n Operatia : %d \n", op_info.pozitie_init, cmd[op_info.pozitie_init], cmd_str.c_str(), op_info.operatia);
+        this->ordinea_operatiilor.push_back(operatie);
+        //printf("pozitia de start %d \n elementul de pe pozitiea de start %c \n comanda este %s \n Operatia corespunzatoare : %d \n", op_info.pozitie_init, cmd[op_info.pozitie_init], cmd_str.c_str(), op_info.operatia);
         operatie = op_info.operatia;
     }
 }
@@ -48,6 +52,7 @@ Commandments::~Commandments()
     this->Comenzi_separate.clear();
     this->Commands.clear();
     this->total_commands = 0;
+    this->ordinea_operatiilor.clear();
 }
 
 int Commandments::GetTotalCMDs()
@@ -63,6 +68,7 @@ char **Commandments::char_convert(int nr_cmd)
     for(const auto &x : argumente){
         vector_exec[i] = new char[argumente[i].size()+1];
         strcpy(vector_exec[i], x.c_str());
+        //printf("argumentul %d este %s\n", i, x.c_str());
         i++;
     }
     vector_exec[i] = nullptr;
@@ -78,6 +84,15 @@ char *Commandments::return_path(int nr_cmd)
     char* path = new char[path_real.size()];
     strcpy(path, path_real.c_str());
     return path;
+}
+
+int Commandments::return_operation(int nr_cmd)
+{
+    if((nr_cmd<=1) && nr_cmd>this->total_commands){
+        return -1;
+    }
+
+    return this->ordinea_operatiilor[nr_cmd-2];
 }
 
 string separa_comenzi(const char* cmd, int pozitie_start, int pozitie_finala){
@@ -100,16 +115,16 @@ pozitii find_sep(const char* string_seq, const char* sep, int pozitie_start){
     };
   
     while(i<(int)strlen(string_seq)){
-      printf("c: %c\n", string_seq[i]);
+      //printf("c: %c\n", string_seq[i]);
       if(string_seq[i]==sep[k]){
-      printf("realizam compararea intre %c si %c \n", string_seq[i], sep[k]);
-      printf("string_seq[%d+%d+1] si sep[%d+1], adica %c si %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
+      //printf("realizam compararea intre %c si %c \n", string_seq[i], sep[k]);
+      //printf("string_seq[%d+%d+1] si sep[%d+1], adica %c si %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
         while(string_seq[i+k+1]==sep[k+1]){
-            printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
+            //printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
           k++;
-          printf("%d\n", k);
+          //printf("%d\n", k);
         }
-        printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
+        //printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
         if(k==((int)strlen(sep))-1){
           mypositions.pozitie_finala = i;
           mypositions.gasit = 1;
@@ -156,15 +171,18 @@ pozitii find_sep(const char* string_seq, const char* sep, int pozitie_start){
   }
 
   vector<string> separate_inside(string cmd){
+    //printf("Comanda este: %s\n", cmd.c_str());
     vector<string> argumente;
     char* temp = new char[cmd.size()+1];
     strcpy(temp, cmd.c_str());
     char * p = strtok(temp , " ");
+    //printf("Argumenteul este format din: ");
     while(p!=NULL){
-      string argument = p;
+      //printf("%s ", p);
       argumente.push_back(p);
       p = strtok(NULL, " ");
     }
+    //printf("\n");
     delete[] temp;
     return argumente;
 

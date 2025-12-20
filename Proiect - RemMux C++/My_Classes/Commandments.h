@@ -23,6 +23,7 @@ class Commandments
 private:
     vector<string> Commands;
     vector<vector<string>> Comenzi_separate; 
+    vector<int> ordinea_operatiilor;
     int total_commands = 0;
 public:
     Commandments(const char* cmd);
@@ -30,4 +31,5 @@ public:
     int GetTotalCMDs();
     char** char_convert(int nr_cmd);
     char* return_path(int nr_cmd);
+    int return_operation(int nr_cmd);
 };
