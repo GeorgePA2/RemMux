@@ -23,10 +23,12 @@ vector<string> separate_inside(string cmd);
 
 Commandments::Commandments(const char *cmd)
 {
+    this->succes_path = "./Success/";
     this->total_commands = 0;
     string cmd_str;
     info_operatii op_info = op_type(cmd, 0);
     int operatie = op_info.operatia;
+    printf("Prima operatie este: %d\n", operatie);
     cmd_str = separa_comenzi(cmd, op_info.pozitie_init, op_info.pozitie_fin);
     //printf("CMD1 este: %s \n", cmd_str.c_str());
     this->Commands.push_back(cmd_str);
@@ -45,6 +47,11 @@ Commandments::Commandments(const char *cmd)
         //printf("pozitia de start %d \n elementul de pe pozitiea de start %c \n comanda este %s \n Operatia corespunzatoare : %d \n", op_info.pozitie_init, cmd[op_info.pozitie_init], cmd_str.c_str(), op_info.operatia);
         operatie = op_info.operatia;
     }
+    //   printf("Operatiile sunt: ");
+    // for(int j=0;j<(int)ordinea_operatiilor.size();j++){
+    //     printf("%d ", ordinea_operatiilor[j]);
+    // }
+    // printf("\n");
 }
 
 Commandments::~Commandments()
@@ -95,6 +102,21 @@ int Commandments::return_operation(int nr_cmd)
     return this->ordinea_operatiilor[nr_cmd-2];
 }
 
+string Commandments::return_cmd(int nr_cmd)
+{
+    return this->Commands[nr_cmd-1];
+}
+
+string Commandments::file_path()
+{
+    return this->succes_path;
+}
+
+void Commandments::creeate_path(string file)
+{
+  this->succes_path += file;
+}
+
 string separa_comenzi(const char* cmd, int pozitie_start, int pozitie_finala){
     string cmd_str;
     for(int i = pozitie_start; i<=pozitie_finala;i++){
@@ -122,7 +144,7 @@ pozitii find_sep(const char* string_seq, const char* sep, int pozitie_start){
         while(string_seq[i+k+1]==sep[k+1]){
             //printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
           k++;
-          //printf("%d\n", k);
+         //printf("%d\n", k);
         }
         //printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
         if(k==((int)strlen(sep))-1){
@@ -155,6 +177,7 @@ pozitii find_sep(const char* string_seq, const char* sep, int pozitie_start){
           .pozitie_init = pos.pozitie_initiala,
           .pozitie_fin = pos.pozitie_finala
         };
+        printf("Operatia este: %s, i este %d \n", x.c_str(), i);
         return result;
       }
       i++;

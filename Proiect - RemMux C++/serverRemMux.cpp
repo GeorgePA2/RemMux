@@ -1,4 +1,4 @@
-
+#include "./My_Classes/Commandments.h"
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <fstream>
 
 
 #define PORT 2908
@@ -27,17 +28,10 @@ typedef struct thData{
 	int cl; 
 }thData;
 
-typedef struct info_operatii
-{
-  string nume;
-  int operatia;
-  int pozitie;
-}info_operatii;
+
 
 typedef struct Protocol
 {
-  int(*valideaza_comanda)(char* comanda);
-  info_operatii(*tipul_operatiei)(const char* comanda);
   void(*executa)(const char* comanda, void* arg);
   void(*returneaza)(void* arg, int code);
 }Protocol;
@@ -45,52 +39,23 @@ typedef struct Protocol
 
 static void *treat(void *); 
 void raspunde(void *);
-
-int find_sep(const char* string_seq, const char* sep){
-  
-  int i = 0;
-  int k = 0;
-
-  while(i<(int)strlen(string_seq)){
-    printf("c: %c\n", string_seq[i]);
-    if(string_seq[i]==sep[k]){
-    printf("realizam compararea intre %c si %c \n", string_seq[i], sep[k]);
-    printf("string_seq[%d+%d+1] si sep[%d+1], adica %c si %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
-      while(string_seq[i+k+1]==sep[k+1]){
-      	printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
-        k++;
-        printf("%d\n", k);
-      }
-      printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
-      if(k==((int)strlen(sep))-1){
-
-        return i;
-      }
-      else{
-         i = i+k;
-         k=0;
-      }
-    }
-    i++;
-  }
-
-  return -1;
-}
-
-
+int find_sep(const char* string_seq, const char* sep);
 int comanda_valida(char* cmd);
-info_operatii op_type(const char* cmd);
 void exec_cmd(const char* cmd, void* arg);
 void return2cl(void* arg, int cod);
-void exec_sg_cmd(const char* cmd, string filename);
 void pregateste_comanda(const char* cmd, char** &vector_de_comenzi);
+
+void executa_mult_cmd(Commandments command, string filename, string filename_temp);
+void pipeline(Commandments cmd, int nr_cmd, string filename);
+void AND_oftheworld(Commandments cmd, int nr_cmd, string filename);
+void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename);
+void handle_execution(Commandments cmd);
+void exec_sg_cmd(Commandments my_command, string filename);
 
 
 
 
 Protocol MyProtocol{
-  .valideaza_comanda = comanda_valida,
-  .tipul_operatiei = op_type,
   .executa = exec_cmd,
   .returneaza = return2cl
 };
@@ -204,92 +169,67 @@ void raspunde(void *arg)
   printf ("[Thread %d]Comanda a fost receptionata...%s\n",tdL.idThread, comanda_primita);
 
   printf("[Thread %d]Trimitem mesajul inapoi...%d\n",tdL.idThread, nr);
-  if(MyProtocol.valideaza_comanda(comanda_primita)==1){
-    printf("Comanda a fost validata! \n");
-    MyProtocol.executa(comanda_primita, arg);
-    printf("Comanda a fost executata! \n");
-    MyProtocol.returneaza(arg, 0);
-  }
-  else{
-    printf("Comanda NU a fost validata! \n");
-    MyProtocol.returneaza(arg, 1);
-  }
+  MyProtocol.executa(comanda_primita, arg);
+  printf("Comanda a fost executata! \n");
+  MyProtocol.returneaza(arg, 0);
 
 
 		    
 
 }
 
-int comanda_valida(char* cmd){
-  string command_name = cmd;
-  for(int i=0;i<(int)command_name.size(); i++){
-    if(command_name[i]==' '){
-      command_name.erase(i);
-    }
-  }
-  string cmd_path = "/usr/bin/" + command_name;
+// int comanda_valida(char* cmd){
+//   string command_name = cmd;
+//   for(int i=0;i<(int)command_name.size(); i++){
+//     if(command_name[i]==' '){
+//       command_name.erase(i);
+//     }
+//   }
+//   string cmd_path = "/usr/bin/" + command_name;
 
-  printf("cmd_path = %s\n", cmd_path.c_str());
+//   printf("cmd_path = %s\n", cmd_path.c_str());
 
-  int fd = open(cmd_path.c_str(), O_RDONLY);
+//   int fd = open(cmd_path.c_str(), O_RDONLY);
 
-  if(fd<-0){
-    return 0;
-  }
-  else{
-    close(fd);
-    return 1;
-  }
-}
-
-info_operatii op_type(const char* cmd){
-  vector<string> separatori = {";", " && ", " || ", " | ", "2>", "<", ">"};
-  int pos;
-  int i = 0;
-  for(const auto& x : separatori){
-    pos=find_sep(cmd, x.c_str());
-    if(pos>-1){
-      info_operatii result{
-        .nume = x,
-        .operatia = i,
-        .pozitie = pos
-      };
-      return result;
-    }
-    i++;
-  }
-  separatori.clear();
-  info_operatii result{
-    .nume = "N/A",
-    .operatia = -1,
-    .pozitie = -1
-  };
-  return result;
-}
+//   if(fd<-0){
+//     return 0;
+//   }
+//   else{
+//     close(fd);
+//     return 1;
+//   }
+// }
 
 void exec_cmd(const char* cmd, void* arg){
   struct thData tdL; 
 	tdL= *((struct thData*)arg);
-  string filename = "./Files/temp" + to_string(tdL.idThread);
+  Commandments command(cmd);
+  string filename = "./Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
+  command.creeate_path("temp_" + to_string(getpid()) + "_" + to_string(pthread_self()));
+
   int file_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
   if(file_fd==-1){
     perror("EROARE LA DESCHIDEREA/CREEREA FILEI!");
   }
 
-  if(MyProtocol.tipul_operatiei(cmd).pozitie==-1){
-    exec_sg_cmd(cmd, filename);
+  if(command.GetTotalCMDs()==1){
+    exec_sg_cmd(command, filename);
   }
   else{
-
-    int nr = strlen(cmd);
-
-    if((write(file_fd, &nr, sizeof(int)))==-1){
-      perror("EROARE LA TRIMITEREA BITILOR!");
-    }
-    if((write(file_fd, cmd, strlen(cmd)))<=-1){
-      perror("EROARE LA TRIMITEREA RASPUNSULUI!");
-    }
+    string filename_temp = filename+"__temp";
+    exec_generic_cmd(command, 1, filename_temp);
+    executa_mult_cmd(command, filename, filename_temp);
   }
+    // int nr = strlen(cmd);
+
+    // if((write(file_fd, &nr, sizeof(int)))==-1){
+    //   perror("EROARE LA TRIMITEREA BITILOR!");
+    // }
+    // if((write(file_fd, cmd, strlen(cmd)))<=-1){
+    //   perror("EROARE LA TRIMITEREA RASPUNSULUI!");
+    // }
+    // break;
+
   close(file_fd);
 }
 
@@ -297,7 +237,7 @@ void exec_cmd(const char* cmd, void* arg){
 void return2cl(void* arg, int is_err){
 	struct thData tdL; 
 	tdL= *((struct thData*)arg);
-  string filename = "./Files/temp" + to_string(tdL.idThread);
+  string filename = "./Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
   int sizeofmsg;
 
   if(is_err==1){
@@ -360,8 +300,7 @@ void return2cl(void* arg, int is_err){
   remove(filename.c_str());
 }
 
-void exec_sg_cmd(const char* cmd, string filename){
-
+void exec_sg_cmd(Commandments my_command, string filename){
   pid_t executare_comanda;
   string filename_temp = filename+"temp";
   int file_fd = open(filename_temp.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
@@ -370,30 +309,26 @@ void exec_sg_cmd(const char* cmd, string filename){
     return;
   }
 
-  int fd = open(filename.c_str(), O_RDWR);
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
   if(fd==-1){
     perror("EROARE! FISIER INEXISTENT! GO BACK!");
     return;
   }
 
 
-  char** argumente;
-  pregateste_comanda(cmd, argumente);
-  string comanda = argumente[0];
-  string cale_absoluta = "/usr/bin/" + comanda;
-  comanda.clear();
-
   int status = 0;
   pid_t asteptare_fiu;
 
   if((executare_comanda=fork())==-1){
       perror("ERORARE LA CREEREA PROCESULUI!");
+      return;
   }
   if(executare_comanda==0){
     dup2(file_fd, 1); 
     close(fd);
-    execv(cale_absoluta.c_str(), argumente);
-    perror("ERORARE LA EXECUTARE!");
+    close(file_fd);
+    execv(my_command.return_path(1), my_command.char_convert(1));
+    printf("Comanda '%s' nu exista!", my_command.return_cmd(1).c_str());
     exit(EXIT_FAILURE);
   }
   else
@@ -410,62 +345,306 @@ void exec_sg_cmd(const char* cmd, string filename){
       }
 
       int file_size = stbuf.st_size;
-      char* temp = new char[file_size+1];
-      if(write(fd, &file_size, sizeof(file_size))<0){
-        perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
-        exit(EXIT_FAILURE);
-      }
-      if(lseek(file_fd, 0, SEEK_SET)==-1){
-        perror("EROARE LA SETAREA POZITIEI!");
-        exit(EXIT_FAILURE);
-      }
-      if(read(file_fd, temp, file_size)<0){
-        perror("EROARE LA CITIRE!!!");
-        exit(EXIT_FAILURE);
-      }
-      temp[file_size] = '\0';
-      printf("TEXTUL: %s \n DE DIMENSIUNE %d \n", temp, file_size);
+      if(file_size>0){
+        char* temp = new char[file_size+1];
+        if(write(fd, &file_size, sizeof(file_size))<0){
+          perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
+         exit(EXIT_FAILURE);
+       }
+       if(lseek(file_fd, 0, SEEK_SET)==-1){
+         perror("EROARE LA SETAREA POZITIEI!");
+         exit(EXIT_FAILURE);
+       }
+        if(read(file_fd, temp, file_size)<0){
+          perror("EROARE LA CITIRE!!!");
+          exit(EXIT_FAILURE);
+        } 
+       temp[file_size] = '\0';
+       printf("TEXTUL: %s \n DE DIMENSIUNE %d \n", temp, file_size);
 
-      if(write(fd, temp, file_size)<0){
+        if(write(fd, temp, file_size)<0){
+          perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
+          exit(EXIT_FAILURE);
+        }
+        delete[] temp;
+      }
+      else{
+        char mesaj_generic[] = "Comanda a fost executata cu succes!";
+        file_size = strlen(mesaj_generic)+1;
+        if(write(fd, &file_size, sizeof(file_size))<0){
+          perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
+         exit(EXIT_FAILURE);
+       }
+       if(write(fd, mesaj_generic, file_size)<0){
         perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
         exit(EXIT_FAILURE);
       }
 
-      for(int i = 0; argumente[i]!=nullptr;i++){
-          delete[] argumente[i];
+
       }
-      delete[] argumente;
-      delete[] temp;
+
       close(fd);
       close(file_fd);
       remove(filename_temp.c_str());
+
   }
 
 
 }
 
-void pregateste_comanda(const char* cmd, char** &vector_de_comenzi){
-  vector<string> argumente;
-  int size = strlen(cmd);
-  char* temp = new char[size+1];
-  strcpy(temp, cmd);
-  temp[size] = '\0';
 
-  char * p = strtok(temp , " ");
-  while(p!=NULL){
-    string argument = p;
-    argumente.push_back(p);
-    p = strtok(NULL, " ");
+void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
+
+
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if(fd==-1){
+    perror("EROARE! FISIER INEXISTENT! GO BACK!");
+    return;
   }
-  delete[] temp;
-  vector_de_comenzi = new char*[argumente.size()+1];
-  int i = 0;
-  for(const auto &x : argumente){
-      vector_de_comenzi[i] = new char[argumente[i].size()+1];
-      strcpy(vector_de_comenzi[i], x.c_str());
-      i++;
+
+  int status = 0;
+  pid_t asteptare_fiu;
+  pid_t executare_comanda;
+  string path = my_command.file_path();
+  printf("fila: %s\n", path.c_str());
+
+  if((executare_comanda=fork())==-1){
+      perror("ERORARE LA CREEREA PROCESULUI!");
   }
-  vector_de_comenzi[i] = nullptr;
-  argumente.clear();
-  
+  if(executare_comanda==0){
+    dup2(fd, 1); 
+    close(fd);
+    sleep(5);
+    execv(my_command.return_path(nr_cmd), my_command.char_convert(nr_cmd));
+    sleep(3);
+    remove(path.c_str());
+    perror("ERORARE LA EXECUTARE!");
+    exit(EXIT_FAILURE);
+  }
+  else
+  {   
+      asteptare_fiu = wait(&status);
+      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+      printf("Operatia %s a avut loc!\n", my_command.return_path(nr_cmd));
+      close(fd);
+      if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+        ofstream succes(path.c_str());
+        succes.close();
+      }
+      else{
+        remove(path.c_str());
+     }
+  }
+
+
+
+}
+
+
+void executa_mult_cmd(Commandments command, string filename, string filename_temp){
+  int nr_cmd = 2;
+  int operatie = command.return_operation(nr_cmd);
+  string path = command.file_path();
+  printf("Operatia este: %d\n", operatie);
+
+  while (nr_cmd<=command.GetTotalCMDs())
+  {
+      switch (operatie)
+      {
+      case 0:
+          pipeline(command, nr_cmd, filename_temp);
+          break;
+
+      case 1:
+          AND_oftheworld(command, nr_cmd, filename_temp);
+      
+      default:
+          printf("I don't care!\n");
+          break;
+      }
+
+      nr_cmd++;
+      operatie = command.return_operation(nr_cmd);
+  }
+
+  int file_fd = open(filename_temp.c_str(), O_RDWR);
+  if(file_fd==-1){perror("EROARE LA DESCHIDEREA/CREEREA FISIERULUI!"); exit(EXIT_FAILURE);}
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if(fd==-1){perror("EROARE LA DESCHIDEREA/CREEREA FISIERULUI!"); exit(EXIT_FAILURE);}
+
+  struct stat stbuf;
+  if(lstat(filename_temp.c_str(), &stbuf)==-1){
+    perror("ERORARE LA PRELUAREA DATELOR!");
+    return;
+  }
+
+  int file_size = stbuf.st_size;
+  if(file_size>0){
+    char* temp = new char[file_size+1];
+    if(write(fd, &file_size, sizeof(file_size))<0){
+      perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
+     exit(EXIT_FAILURE);
+   }
+   if(lseek(file_fd, 0, SEEK_SET)==-1){
+     perror("EROARE LA SETAREA POZITIEI!");
+     exit(EXIT_FAILURE);
+   }
+    if(read(file_fd, temp, file_size)<0){
+      perror("EROARE LA CITIRE!!!");
+      exit(EXIT_FAILURE);
+    } 
+   temp[file_size] = '\0';
+   //printf("TEXTUL: %s \n DE DIMENSIUNE %d \n", temp, file_size);
+
+    if(write(fd, temp, file_size)<0){
+      perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
+      exit(EXIT_FAILURE);
+    }
+    delete[] temp;
+  }
+  else{
+    char mesaj_generic[] = "...";
+    file_size = strlen(mesaj_generic)+1;
+    if(write(fd, &file_size, sizeof(file_size))<0){
+      perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
+     exit(EXIT_FAILURE);
+   }
+   if(write(fd, mesaj_generic, file_size)<0){
+    perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
+    exit(EXIT_FAILURE);
+  }
+
+
+  }
+
+  //printf("Comanda a fost executata cu succes!\n");
+  remove(filename_temp.c_str());
+  remove(path.c_str());
+
+
+}
+
+void pipeline(Commandments cmd, int nr_cmd, string filename){
+      //printf("COMANDA1 ESTE: %s \n COMANDA2 ESTE: %s \n", cmd1, cmd2);
+
+      pid_t proces;
+      pid_t  asteptare_fiu;
+      string filenametemp = filename+"__temporary";
+      int status;
+      string path = cmd.file_path();
+
+
+      int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      if(fd==-1){
+          perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+          exit(EXIT_FAILURE);
+      }
+      int file_fd = open(filenametemp.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if(file_fd==-1){
+          perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+          exit(EXIT_FAILURE);
+      }
+
+
+      lseek(fd, 0, SEEK_SET);
+      if((proces=fork())==-1){
+          perror("EROARE LA FURCULITA!!");
+          exit(EXIT_FAILURE);
+      }
+      if(proces==0){
+          dup2(fd, 0);
+          dup2(file_fd, 1);
+          close(fd);
+          close(file_fd);
+          execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
+          perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");
+          exit(EXIT_FAILURE);
+      }
+      else{
+          asteptare_fiu = wait(&status);
+          if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+
+          sync();
+
+          close(fd);
+          close(file_fd);
+
+          if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+            ofstream succes(path.c_str());
+            succes.close();
+          }
+          else{
+            remove(path.c_str());
+         }
+          remove(filename.c_str());
+          if(rename(filenametemp.c_str(), filename.c_str()) == -1){
+            perror("EROARE LA RENAME!");
+            exit(EXIT_FAILURE);
+        }
+
+
+      }
+}
+
+void AND_oftheworld(Commandments cmd, int nr_cmd, string filename){
+
+  ///idee: implementarea unei variabile "previous" care tine cont daca codul anterior a esuat sau nu. Ar fi o idee sa includ previous direct in Commandments.
+
+  string path = cmd.file_path();
+  int file_exists = open(path.c_str(), O_RDONLY);
+  printf("%s\n", path.c_str());
+  if(file_exists==-1){
+    printf("COMANDA ANTERIOARA A ESUAT!");
+    return;
+  }
+  close(file_exists);
+
+  pid_t proces;
+  pid_t  asteptare_fiu;
+  int status;
+
+  printf("fila: %s\n", path.c_str());
+
+
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(fd==-1){
+      perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+      exit(EXIT_FAILURE);
+  }
+
+
+  lseek(fd, 0, SEEK_SET);
+  if((proces=fork())==-1){
+      perror("EROARE LA FURCULITA!!");
+      exit(EXIT_FAILURE);
+  }
+  if(proces==0){
+      dup2(fd, 0);
+      dup2(fd, 1);
+      close(fd);
+      sleep(5);
+      execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
+      remove(path.c_str());
+      perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");
+      exit(EXIT_FAILURE);
+  }
+  else{
+      asteptare_fiu = wait(&status);
+      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+      sync();
+      close(fd);
+
+      if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+        ofstream succes(path.c_str());
+        succes.close();
+      }
+      else{
+        remove(path.c_str());
+     }
+
+
+
+  }
+
+
 }

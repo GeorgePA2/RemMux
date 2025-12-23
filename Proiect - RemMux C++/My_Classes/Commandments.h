@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <fstream>
 
 using namespace std;
 
@@ -25,6 +26,7 @@ private:
     vector<vector<string>> Comenzi_separate; 
     vector<int> ordinea_operatiilor;
     int total_commands = 0;
+    string succes_path;
 public:
     Commandments(const char* cmd);
     ~Commandments();
@@ -32,4 +34,7 @@ public:
     char** char_convert(int nr_cmd);
     char* return_path(int nr_cmd);
     int return_operation(int nr_cmd);
+    string return_cmd(int nr_cmd);
+    string file_path();
+    void creeate_path(string file);
 };
