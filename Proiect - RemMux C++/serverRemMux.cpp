@@ -46,12 +46,15 @@ void return2cl(void* arg, int cod);
 void pregateste_comanda(const char* cmd, char** &vector_de_comenzi);
 
 void executa_mult_cmd(Commandments command, string filename, string filename_temp);
-void pipeline(Commandments cmd, int nr_cmd, string filename);
-void AND_oftheworld(Commandments cmd, int nr_cmd, string filename);
 void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename);
 void handle_execution(Commandments cmd);
 void exec_sg_cmd(Commandments my_command, string filename);
 
+
+void ORwell(Commandments cmd, int nr_cmd, string filename);
+void pipeline(Commandments cmd, int nr_cmd, string filename);
+void AND_oftheworld(Commandments cmd, int nr_cmd, string filename);
+void DotCom(Commandments cmd, int nr_cmd, string filename);
 
 
 
@@ -414,9 +417,7 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
   if(executare_comanda==0){
     dup2(fd, 1); 
     close(fd);
-    sleep(5);
     execv(my_command.return_path(nr_cmd), my_command.char_convert(nr_cmd));
-    sleep(3);
     remove(path.c_str());
     perror("ERORARE LA EXECUTARE!");
     exit(EXIT_FAILURE);
@@ -457,6 +458,15 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
 
       case 1:
           AND_oftheworld(command, nr_cmd, filename_temp);
+          break;
+
+      case 2:
+          ORwell(command, nr_cmd, filename_temp);
+          break;
+
+      case 3:
+          DotCom(command, nr_cmd, filename_temp);
+          break;
       
       default:
           printf("I don't care!\n");
@@ -465,6 +475,7 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
 
       nr_cmd++;
       operatie = command.return_operation(nr_cmd);
+      printf("Operatia este: %d\nNr CMD este: %d\n", operatie, nr_cmd);
   }
 
   int file_fd = open(filename_temp.c_str(), O_RDWR);
@@ -622,7 +633,120 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename){
       dup2(fd, 0);
       dup2(fd, 1);
       close(fd);
-      sleep(5);
+      execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
+      remove(path.c_str());
+      perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");
+      exit(EXIT_FAILURE);
+  }
+  else{
+      asteptare_fiu = wait(&status);
+      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+      sync();
+      close(fd);
+
+      if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+        ofstream succes(path.c_str());
+        succes.close();
+      }
+      else{
+        remove(path.c_str());
+     }
+
+
+
+  }
+
+
+}
+
+void ORwell(Commandments cmd, int nr_cmd, string filename){
+
+
+
+  string path = cmd.file_path();
+  int file_exists = open(path.c_str(), O_RDONLY);
+  printf("%s\n", path.c_str());
+  if(file_exists!=-1){
+    printf("COMANDA ANTERIOARA NU A ESUAT!");
+    return;
+  }
+  close(file_exists);
+
+  pid_t proces;
+  pid_t  asteptare_fiu;
+  int status;
+
+  printf("fila: %s\n", path.c_str());
+
+
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(fd==-1){
+      perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+      exit(EXIT_FAILURE);
+  }
+
+
+  lseek(fd, 0, SEEK_SET);
+  if((proces=fork())==-1){
+      perror("EROARE LA FURCULITA!!");
+      exit(EXIT_FAILURE);
+  }
+  if(proces==0){
+      dup2(fd, 0);
+      dup2(fd, 1);
+      close(fd);
+      execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
+      remove(path.c_str());
+      perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");
+      exit(EXIT_FAILURE);
+  }
+  else{
+      asteptare_fiu = wait(&status);
+      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+      sync();
+      close(fd);
+
+      if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+        ofstream succes(path.c_str());
+        succes.close();
+      }
+      else{
+        remove(path.c_str());
+     }
+
+
+
+  }
+
+
+}
+
+void DotCom(Commandments cmd, int nr_cmd, string filename){
+
+
+
+  string path = cmd.file_path();
+  pid_t proces;
+  pid_t  asteptare_fiu;
+  int status;
+
+
+  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if(fd==-1){
+      perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+      exit(EXIT_FAILURE);
+  }
+
+
+  lseek(fd, 0, SEEK_SET);
+  if((proces=fork())==-1){
+      perror("EROARE LA FURCULITA!!");
+      exit(EXIT_FAILURE);
+  }
+  if(proces==0){
+      dup2(fd, 0);
+      dup2(fd, 1);
+      close(fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
       remove(path.c_str());
       perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");

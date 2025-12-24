@@ -125,71 +125,56 @@ string separa_comenzi(const char* cmd, int pozitie_start, int pozitie_finala){
     return cmd_str;
   }
 
-pozitii find_sep(const char* string_seq, const char* sep, int pozitie_start){
+pozitii find_sep(string string_seq, string sep, int pozitie_start){
   
-    int i = pozitie_start;
-    int k = 0;
+    long unsigned int i = string_seq.find(sep, pozitie_start);
+
+    if(i!=string::npos){
+      pozitii mypositions{
+        .gasit=1,
+        .pozitie_initiala = pozitie_start,
+        .pozitie_finala = (int)i
+      };
+      return mypositions;
+    }
   
     pozitii mypositions{
       .gasit = 0,
       .pozitie_initiala = pozitie_start,
-      .pozitie_finala = (int)strlen(string_seq)
+      .pozitie_finala = (int)(string_seq.size()-1)
     };
   
-    while(i<(int)strlen(string_seq)){
-      //printf("c: %c\n", string_seq[i]);
-      if(string_seq[i]==sep[k]){
-      //printf("realizam compararea intre %c si %c \n", string_seq[i], sep[k]);
-      //printf("string_seq[%d+%d+1] si sep[%d+1], adica %c si %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
-        while(string_seq[i+k+1]==sep[k+1]){
-            //printf("string_seq[%d+%d+1]==sep[%d+1], adica %c = %c\n", i, k, k, string_seq[i+k+1], sep[k+1]);
-          k++;
-         //printf("%d\n", k);
-        }
-        //printf("k este %d si lungimea sep este %d\n", k, (int)strlen(sep));
-        if(k==((int)strlen(sep))-1){
-          mypositions.pozitie_finala = i;
-          mypositions.gasit = 1;
-          mypositions.pozitie_initiala = pozitie_start;
-          return mypositions;
-        }
-        else{
-           i = i+k;
-           k=0;
-        }
-      }
-      i++;
-    }
   
     return mypositions;
   }
 
   info_operatii op_type(const char* cmd, int poz_start){
     vector<string> separatori = {" | ", " && ", " || ", " ; ", "2>", "<", ">"};
+    string commander = cmd;
     pozitii pos;
+    int poz_min = strlen(cmd)+10;
     int i = 0;
-    for(const auto& x : separatori){
-      pos=find_sep(cmd, x.c_str(), poz_start);
-      if(pos.gasit){
-        info_operatii result{
-          .nume = x,
-          .operatia = i,
-          .pozitie_init = pos.pozitie_initiala,
-          .pozitie_fin = pos.pozitie_finala
-        };
-        printf("Operatia este: %s, i este %d \n", x.c_str(), i);
-        return result;
-      }
-      i++;
-    }
-    
-    separatori.clear();
+
     info_operatii result{
       .nume = "N/A",
       .operatia = -1,
       .pozitie_init = poz_start,
       .pozitie_fin = (int)strlen(cmd)
     };
+    for(const auto& x : separatori){
+      pos=find_sep(commander, x, poz_start);
+      if((pos.gasit) && (pos.pozitie_finala<poz_min)){
+        result.nume = x;
+        result.operatia = i;
+        result.pozitie_init = pos.pozitie_initiala;
+        result.pozitie_fin = pos.pozitie_finala;
+        poz_min = pos.pozitie_finala;
+        //printf("Operatia este: %s, i este %d \n", x.c_str(), i);
+      }
+      i++;
+      
+    }
+
     return result;
   }
 
