@@ -52,10 +52,12 @@ void exec_sg_cmd(Commandments my_command, string filename);
 
 
 void ORwell(Commandments cmd, int nr_cmd, string filename);
-void pipeline(Commandments cmd, int nr_cmd, string filename);
-void AND_oftheworld(Commandments cmd, int nr_cmd, string filename);
+void pipeline(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
+void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file);
 void DotCom(Commandments cmd, int nr_cmd, string filename);
+void Redirect_SingleOutput(string OG_file, string output);
 
+bool valid_output(string file);
 
 
 Protocol MyProtocol{
@@ -419,7 +421,7 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
     close(fd);
     execv(my_command.return_path(nr_cmd), my_command.char_convert(nr_cmd));
     remove(path.c_str());
-    perror("ERORARE LA EXECUTARE!");
+    printf("Comanda %s nu exista\n", my_command.return_cmd(nr_cmd).c_str());
     exit(EXIT_FAILURE);
   }
   else
@@ -446,18 +448,29 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
   int nr_cmd = 2;
   int operatie = command.return_operation(nr_cmd);
   string path = command.file_path();
+  string output;
+  int special_operation = 0;
   printf("Operatia este: %d\n", operatie);
 
   while (nr_cmd<=command.GetTotalCMDs())
   {
+    if(command.is_next_file(nr_cmd)){
+      output = command.return_cmd(nr_cmd+1);
+      special_operation = 1;
+    }
+    else{
+      output = filename_temp;
+      special_operation = 0;
+    }
+
       switch (operatie)
       {
       case 0:
-          pipeline(command, nr_cmd, filename_temp);
+          pipeline(command, nr_cmd, output, special_operation, output);
           break;
 
       case 1:
-          AND_oftheworld(command, nr_cmd, filename_temp);
+          AND_oftheworld(command, nr_cmd, filename_temp, special_operation);
           break;
 
       case 2:
@@ -467,15 +480,22 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
       case 3:
           DotCom(command, nr_cmd, filename_temp);
           break;
+
+      case 4:{
+          string output = command.return_cmd(nr_cmd);
+          printf("[DEBUG]Output is : %s\n", output.c_str());
+          Redirect_SingleOutput(filename_temp, output);
+          break;
+      }
       
       default:
           printf("I don't care!\n");
           break;
       }
 
-      nr_cmd++;
+      nr_cmd += special_operation + 1;
       operatie = command.return_operation(nr_cmd);
-      printf("Operatia este: %d\nNr CMD este: %d\n", operatie, nr_cmd);
+      printf("[DEBUG]Operatia este: %d\n[DEBUG]Nr CMD este: %d\n", operatie, nr_cmd);
   }
 
   int file_fd = open(filename_temp.c_str(), O_RDWR);
@@ -514,7 +534,7 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
     delete[] temp;
   }
   else{
-    char mesaj_generic[] = "...";
+    char mesaj_generic[] = "Comanda a fost executata cu succes!";
     file_size = strlen(mesaj_generic)+1;
     if(write(fd, &file_size, sizeof(file_size))<0){
       perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
@@ -535,7 +555,7 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
 
 }
 
-void pipeline(Commandments cmd, int nr_cmd, string filename){
+void pipeline(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
       //printf("COMANDA1 ESTE: %s \n COMANDA2 ESTE: %s \n", cmd1, cmd2);
 
       pid_t proces;
@@ -550,11 +570,25 @@ void pipeline(Commandments cmd, int nr_cmd, string filename){
           perror("EROARE LA DESCHIDEREA FISIERULUI!!");
           exit(EXIT_FAILURE);
       }
-      int file_fd = open(filenametemp.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      int file_fd;
+      if(special_file==0){
+      file_fd = open(filenametemp.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
       if(file_fd==-1){
           perror("EROARE LA DESCHIDEREA FISIERULUI!!");
           exit(EXIT_FAILURE);
       }
+    }
+
+    else{
+      file_fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if(file_fd==-1){
+        string msg_err = "Permission denied!";
+        if((write(fd, msg_err.c_str(), msg_err.size()))==-1){
+          perror("EROARE LA SCRIERE!");
+          exit(EXIT_FAILURE);
+        }
+    }
+    }
 
 
       lseek(fd, 0, SEEK_SET);
@@ -587,19 +621,19 @@ void pipeline(Commandments cmd, int nr_cmd, string filename){
           else{
             remove(path.c_str());
          }
-          remove(filename.c_str());
-          if(rename(filenametemp.c_str(), filename.c_str()) == -1){
-            perror("EROARE LA RENAME!");
-            exit(EXIT_FAILURE);
-        }
+          if(special_file==0){
+            remove(filename.c_str());
+            if(rename(filenametemp.c_str(), filename.c_str()) == -1){
+             perror("EROARE LA RENAME!");
+             exit(EXIT_FAILURE);
+          }
+         }
 
 
       }
 }
 
-void AND_oftheworld(Commandments cmd, int nr_cmd, string filename){
-
-  ///idee: implementarea unei variabile "previous" care tine cont daca codul anterior a esuat sau nu. Ar fi o idee sa includ previous direct in Commandments.
+void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file){
 
   string path = cmd.file_path();
   int file_exists = open(path.c_str(), O_RDONLY);
@@ -609,20 +643,25 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename){
     return;
   }
   close(file_exists);
+  int fd;
+
+  if(special_file==1){
+    fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
+  }
+  else{
+    fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666); 
+  }
+
+  if(fd==-1){
+    perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+    exit(EXIT_FAILURE);
+}
 
   pid_t proces;
   pid_t  asteptare_fiu;
   int status;
 
   printf("fila: %s\n", path.c_str());
-
-
-  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
-  if(fd==-1){
-      perror("EROARE LA DESCHIDEREA FISIERULUI!!");
-      exit(EXIT_FAILURE);
-  }
-
 
   lseek(fd, 0, SEEK_SET);
   if((proces=fork())==-1){
@@ -771,4 +810,72 @@ void DotCom(Commandments cmd, int nr_cmd, string filename){
   }
 
 
+}
+
+void Redirect_SingleOutput(string OG_file, string output){
+    int fd_OG = open(OG_file.c_str(), O_RDWR | O_APPEND, 0666);
+    if(fd_OG==-1){
+      perror("EROARE LA DESCHIDEREA FILEI!");
+      exit(EXIT_FAILURE);
+    }
+    int fd_output = open(output.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    if(fd_output==-1){
+      string no_permission = "Permission denied!";
+      close(fd_OG);
+      int fd_trunc = open(OG_file.c_str(), O_WRONLY | O_TRUNC);
+      if(fd_trunc==-1){
+        perror("EROARE LA CREEREA FILEI DE TRUNCHIERE!");
+        exit(EXIT_FAILURE);
+      }
+      if((write(fd_trunc, no_permission.c_str(), no_permission.size())==-1)){
+        perror("EROARE LA SCRIEREA IN FISIERUL Original!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_output);
+      close(fd_trunc);
+      return;
+    }
+
+    struct stat stbuf;
+    if(lstat(OG_file.c_str(), &stbuf)==-1){
+      perror("ERORARE LA PRELUAREA DATELOR!");
+      return;
+    }
+  
+    int file_size = stbuf.st_size;
+
+    if(file_size>0){
+      char* temp = new char[file_size+1];
+     if(lseek(fd_OG, 0, SEEK_SET)==-1){
+       perror("EROARE LA SETAREA POZITIEI!");
+       exit(EXIT_FAILURE);
+     }
+      if(read(fd_OG, temp, file_size)<0){
+        perror("EROARE LA CITIRE!!!");
+        exit(EXIT_FAILURE);
+      } 
+     temp[file_size] = '\0';
+      if(write(fd_output, temp, file_size)<0){
+        perror("EROARE LA SCRIEREA PE FISIERUL FINAL!");
+        exit(EXIT_FAILURE);
+      }
+      delete[] temp;
+      close(fd_output);
+      close(fd_OG);
+
+      int fd_trunc = open(OG_file.c_str(), O_WRONLY | O_TRUNC);
+      close(fd_trunc);
+    }
+    
+}
+
+bool valid_output(string file)
+{
+  int fd = open(file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if(fd==-1){
+    return false;
+  }
+  else{
+    return true;
+  }
 }

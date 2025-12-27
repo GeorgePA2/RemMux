@@ -35,6 +35,8 @@ public:
     char* return_path(int nr_cmd);
     int return_operation(int nr_cmd);
     string return_cmd(int nr_cmd);
+    bool is_next_file(int nr_cmd);
     string file_path();
     void creeate_path(string file);
+    bool valid_output(string file);
 };

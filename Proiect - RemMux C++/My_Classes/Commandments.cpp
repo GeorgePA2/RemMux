@@ -107,6 +107,16 @@ string Commandments::return_cmd(int nr_cmd)
     return this->Commands[nr_cmd-1];
 }
 
+bool Commandments::is_next_file(int nr_cmd)
+{
+    if(nr_cmd>0 && nr_cmd<GetTotalCMDs()){
+      if(return_operation(nr_cmd+1)==4){
+        return true;
+      }
+    }
+    return false;
+}
+
 string Commandments::file_path()
 {
     return this->succes_path;
@@ -116,6 +126,7 @@ void Commandments::creeate_path(string file)
 {
   this->succes_path += file;
 }
+
 
 string separa_comenzi(const char* cmd, int pozitie_start, int pozitie_finala){
     string cmd_str;
@@ -149,7 +160,7 @@ pozitii find_sep(string string_seq, string sep, int pozitie_start){
   }
 
   info_operatii op_type(const char* cmd, int poz_start){
-    vector<string> separatori = {" | ", " && ", " || ", " ; ", "2>", "<", ">"};
+    vector<string> separatori = {" | ", " && ", " || ", " ; ", " > ", " < ", " 2> "};
     string commander = cmd;
     pozitii pos;
     int poz_min = strlen(cmd)+10;
