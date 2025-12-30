@@ -113,7 +113,7 @@ bool Commandments::is_next_file(int nr_cmd)
       if(return_operation(nr_cmd+1>=4) && (return_operation(nr_cmd)>=1 && return_operation(nr_cmd)<4)){
         return true;
       }
-      if(return_operation(nr_cmd+1)==5 && return_operation(nr_cmd==0)){
+      if(return_operation(nr_cmd+1)>=5 && return_operation(nr_cmd==0)){
         return true;
       }
     }
