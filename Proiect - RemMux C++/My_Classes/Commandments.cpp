@@ -110,7 +110,7 @@ string Commandments::return_cmd(int nr_cmd)
 bool Commandments::is_next_file(int nr_cmd)
 {
     if(nr_cmd>0 && nr_cmd<GetTotalCMDs()){
-      if(return_operation(nr_cmd+1)==4){
+      if((return_operation(nr_cmd+1)==4) && (return_operation(nr_cmd)>=1 && return_operation(nr_cmd)<4)){
         return true;
       }
     }

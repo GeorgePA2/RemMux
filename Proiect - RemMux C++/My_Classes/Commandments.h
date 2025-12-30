@@ -38,5 +38,4 @@ public:
     bool is_next_file(int nr_cmd);
     string file_path();
     void creeate_path(string file);
-    bool valid_output(string file);
 };
