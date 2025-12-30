@@ -45,14 +45,14 @@ void exec_cmd(const char* cmd, void* arg);
 void return2cl(void* arg, int cod);
 void pregateste_comanda(const char* cmd, char** &vector_de_comenzi);
 
-void executa_mult_cmd(Commandments command, string filename, string filename_temp);
-void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename);
+void executa_mult_cmd(Commandments command, string filename, string filename_temp, int start);
+void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, string input, int special_cmd);
 void handle_execution(Commandments cmd);
 void exec_sg_cmd(Commandments my_command, string filename);
 
 
 void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
-void pipeline(Commandments cmd, int nr_cmd, string filename);
+void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int special_file);
 void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
 void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
 void Redirect_SingleOutput(string OG_file, string output);
@@ -222,8 +222,22 @@ void exec_cmd(const char* cmd, void* arg){
   }
   else{
     string filename_temp = filename+"__temp";
-    exec_generic_cmd(command, 1, filename_temp);
-    executa_mult_cmd(command, filename, filename_temp);
+    int starting_point = 2;
+    if(command.return_operation(2)==5){
+      exec_generic_cmd(command, 1, filename_temp, command.return_cmd(2), 1);
+      starting_point = 3;
+    }
+    else if (command.return_operation(2)==6)
+    {
+      exec_generic_cmd(command, 1, filename_temp, command.return_cmd(2), 2);
+      starting_point = 3;
+    }
+    else{
+      exec_generic_cmd(command, 1, filename_temp, filename_temp, 0);
+      starting_point = 2;
+    }
+    executa_mult_cmd(command, filename, filename_temp, starting_point);
+
   }
     // int nr = strlen(cmd);
 
@@ -398,13 +412,26 @@ void exec_sg_cmd(Commandments my_command, string filename){
 }
 
 
-void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
+void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, string input, int special_cmd){
 
 
   int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
   if(fd==-1){
     perror("EROARE! FISIER INEXISTENT! GO BACK!");
     return;
+  }
+  int fd_input;
+  if(special_cmd==1){
+    fd_input = open(input.c_str(), O_RDONLY);
+    if(fd_input==-1){
+      string mesaj_eroare = "Permission denied!";
+      if((write(fd, mesaj_eroare.c_str(), mesaj_eroare.size()))==-1){
+        perror("EROARE LA SCRIEREA PE FISIER!!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd);
+      return;
+    }
   }
 
   int status = 0;
@@ -419,6 +446,10 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
   if(executare_comanda==0){
     dup2(fd, 1); 
     close(fd);
+    if(special_cmd==1){
+      dup2(fd_input, 0);
+      close(fd_input);
+    }
     execv(my_command.return_path(nr_cmd), my_command.char_convert(nr_cmd));
     remove(path.c_str());
     printf("Comanda %s nu exista\n", my_command.return_cmd(nr_cmd).c_str());
@@ -444,19 +475,19 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename){
 }
 
 
-void executa_mult_cmd(Commandments command, string filename, string filename_temp){
-  int nr_cmd = 2;
+void executa_mult_cmd(Commandments command, string filename, string filename_temp, int start){
+  int nr_cmd = start;
   int operatie = command.return_operation(nr_cmd);
   string path = command.file_path();
   string output;
   int special_operation = 0;
-  printf("Operatia este: %d\n", operatie);
+  printf("[DEBUG]Operatia este: %d\n", operatie);
 
   while (nr_cmd<=command.GetTotalCMDs())
   {
     if(command.is_next_file(nr_cmd)){
       output = command.return_cmd(nr_cmd+1);
-      special_operation = 1;
+      special_operation = command.return_operation(nr_cmd+1)-3;
     }
     else{
       output = filename_temp;
@@ -466,18 +497,22 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
       switch (operatie)
       {
       case 0:
-          pipeline(command, nr_cmd, filename_temp);
+          printf("[DEBUG]Output is : %s\n", output.c_str());
+          pipeline(command, nr_cmd, filename_temp, output, special_operation);
           break;
 
       case 1:
+          printf("[DEBUG]Output is : %s\n", output.c_str());
           AND_oftheworld(command, nr_cmd, filename_temp, special_operation, output);
           break;
 
       case 2:
+          printf("[DEBUG]Output is : %s\n", output.c_str());
           ORwell(command, nr_cmd, filename_temp, special_operation, output);
           break;
 
       case 3:
+          printf("[DEBUG]Output is : %s\n", output.c_str());
           DotCom(command, nr_cmd, filename_temp, special_operation, output);
           break;
 
@@ -487,6 +522,8 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
           Redirect_SingleOutput(filename_temp, output);
           break;
       }
+      case 5:
+          break;
       
       default:
           printf("I don't care!\n");
@@ -555,7 +592,7 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
 
 }
 
-void pipeline(Commandments cmd, int nr_cmd, string filename){
+void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int special_file){
 
   //printf("COMANDA1 ESTE: %s \n COMANDA2 ESTE: %s \n", cmd1, cmd2);
   pid_t proces;
@@ -563,10 +600,33 @@ void pipeline(Commandments cmd, int nr_cmd, string filename){
   string filenametemp = filename+"__temporary";
   int status;
   string path = cmd.file_path();
-  int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+
+  int fd;
+
+  if(special_file!=2){
+  fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
   if(fd==-1){
       perror("EROARE LA DESCHIDEREA FISIERULUI!!");
       exit(EXIT_FAILURE);
+  }
+}
+  else{
+    printf("[DEBUG] Avem input in pipeline, anume %s\n", input.c_str());
+    fd = open(input.c_str(), O_RDONLY);
+    if(fd==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if(fd_trunc==-1){
+        perror("EROARE LA CREEREA TRUNCHIERII IN PIPELINE!!");
+        exit(EXIT_FAILURE);
+      }
+      string msg_err = "Permision denied!";
+      if((write(fd_trunc, msg_err.c_str(), msg_err.size()))==-1){
+        perror("EROARE LA TRANSMITEREA MESAJULUI DE EROARE!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return;
+    }
   }
   int file_fd = open(filenametemp.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
 
@@ -620,11 +680,14 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
   int file_exists = open(path.c_str(), O_RDONLY);
   printf("%s\n", path.c_str());
   if(file_exists==-1){
-    printf("COMANDA ANTERIOARA A ESUAT!");
+    printf("[DEBUG]COMANDA ANTERIOARA A ESUAT!\n");
     return;
   }
   close(file_exists);
   int fd;
+  int fd_input;
+
+  printf("[DEBUG] special file = %d\n", special_file);
 
   if(special_file==1){
     fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
@@ -651,6 +714,25 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
     }
   }
 
+  if(special_file==2){
+    fd_input = open(output.c_str(), O_RDONLY); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
+    if(fd_input==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      string no_permission = "Permission denied!";
+      if(fd_trunc==-1){
+        perror("EROARE! NU SE POATE DESCHIDE FILA ORIGINALA!!");
+        exit(EXIT_FAILURE);
+      }
+      if((write(fd_trunc, no_permission.c_str(), no_permission.size()))==-1){
+        perror("EROARE LA SCRIEREA PE FISIERUL ORIGINAL!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return;
+    }
+    printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
+  }
+
 
 
   pid_t proces;
@@ -665,9 +747,17 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+      if(special_file==2){
+        dup2(fd_input, 0);
+      }
+      else{
       dup2(fd, 0);
+      }
       dup2(fd, 1);
       close(fd);
+      if(special_file==2){
+        close(fd_input);
+      }
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
       remove(path.c_str());
       perror("ERORARE! COMANDA NU A PUTUT FI EXECUTATA!!");
@@ -715,6 +805,7 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
 
 
   int fd;
+  int fd_input;
 
   if(special_file==1){
     fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
@@ -741,6 +832,25 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
     }
   }
 
+  if(special_file==2){
+    fd_input = open(output.c_str(), O_RDONLY); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
+    if(fd_input==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      string no_permission = "Permission denied!";
+      if(fd_trunc==-1){
+        perror("EROARE! NU SE POATE DESCHIDE FILA ORIGINALA!!");
+        exit(EXIT_FAILURE);
+      }
+      if((write(fd_trunc, no_permission.c_str(), no_permission.size()))==-1){
+        perror("EROARE LA SCRIEREA PE FISIERUL ORIGINAL!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return;
+    }
+    printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
+  }
+
 
   lseek(fd, 0, SEEK_SET);
   if((proces=fork())==-1){
@@ -748,7 +858,13 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+    if(special_file==2){
+      dup2(fd_input, 0);
+      close(fd_input);
+    }
+    else{
       dup2(fd, 0);
+    }
       dup2(fd, 1);
       close(fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
@@ -788,6 +904,8 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
 
 
   int fd;
+  int fd_input;
+
   if(special_file==1){
     fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
     if(fd==-1){
@@ -813,6 +931,25 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
     }
   }
 
+  if(special_file==2){
+    fd_input = open(output.c_str(), O_RDONLY); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
+    if(fd_input==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      string no_permission = "Permission denied!";
+      if(fd_trunc==-1){
+        perror("EROARE! NU SE POATE DESCHIDE FILA ORIGINALA!!");
+        exit(EXIT_FAILURE);
+      }
+      if((write(fd_trunc, no_permission.c_str(), no_permission.size()))==-1){
+        perror("EROARE LA SCRIEREA PE FISIERUL ORIGINAL!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return;
+    }
+    printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
+  }
+
 
   lseek(fd, 0, SEEK_SET);
   if((proces=fork())==-1){
@@ -820,7 +957,13 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+    if(special_file==2){
+      dup2(fd_input, 0);
+      close(fd_input);
+    }
+    else{
       dup2(fd, 0);
+    }
       dup2(fd, 1);
       close(fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
