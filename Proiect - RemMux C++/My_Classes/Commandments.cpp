@@ -39,7 +39,7 @@ Commandments::Commandments(const char *cmd)
     {
 
         op_info = op_type(cmd, op_info.pozitie_fin + op_info.nume.size());
-        cmd_str = separa_comenzi(cmd, op_info.pozitie_init, op_info.pozitie_fin);
+        cmd_str = separa_comenzi(cmd, op_info.pozitie_init+1, op_info.pozitie_fin);
         this->Commands.push_back(cmd_str);
         this->Comenzi_separate.push_back(separate_inside(cmd_str));
         this->total_commands++;
@@ -147,7 +147,7 @@ pozitii find_sep(string string_seq, string sep, int pozitie_start){
       pozitii mypositions{
         .gasit=1,
         .pozitie_initiala = pozitie_start,
-        .pozitie_finala = (int)i
+        .pozitie_finala = (int)i-1
       };
       return mypositions;
     }

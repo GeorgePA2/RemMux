@@ -469,7 +469,12 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, stri
     }
     execv(my_command.return_path(nr_cmd), my_command.char_convert(nr_cmd));
     remove(path.c_str());
+    if(special_cmd==2){
     fprintf(stderr, "Comanda %s nu exista\n", my_command.return_cmd(nr_cmd).c_str());
+    }
+    else{
+      printf("Comanda %s nu exista\n", my_command.return_cmd(nr_cmd).c_str());
+    }
     exit(EXIT_FAILURE);
   }
   else
@@ -497,6 +502,7 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
   int operatie = command.return_operation(nr_cmd);
   string path = command.file_path();
   string output;
+  string lastfile = filename_temp;
   int special_operation = 0;
   printf("[DEBUG]Operatia este: %d\n", operatie);
 
@@ -516,27 +522,33 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
       case 0:
           printf("[DEBUG]Output is : %s\n[DEBUG]Special operation = %d\n", output.c_str(), special_operation);
           pipeline(command, nr_cmd, filename_temp, output, special_operation);
+          lastfile = filename_temp;
           break;
 
       case 1:
           printf("[DEBUG]Output is : %s\n", output.c_str());
           AND_oftheworld(command, nr_cmd, filename_temp, special_operation, output);
+          lastfile = output;
           break;
 
       case 2:
           printf("[DEBUG]Output is : %s\n", output.c_str());
           ORwell(command, nr_cmd, filename_temp, special_operation, output);
+          lastfile = output;
           break;
 
       case 3:
           printf("[DEBUG]Output is : %s\n", output.c_str());
           DotCom(command, nr_cmd, filename_temp, special_operation, output);
+          lastfile = output;
           break;
 
       case 4:{
           string output = command.return_cmd(nr_cmd);
           printf("[DEBUG]Output is : %s\n", output.c_str());
-          Redirect_SingleOutput(filename_temp, output);
+          printf("[DEBUG]Lastfile is : %s\n", lastfile.c_str());
+          Redirect_SingleOutput(lastfile, output);
+          lastfile = output;
           break;
       }
       case 5:
@@ -698,7 +710,12 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
       close(fd);
       close(file_fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
+      if(special_file==3){
       fprintf(stderr, "Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+      }
+      else{
+        printf("Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+      }
       exit(EXIT_FAILURE);
   }
   else{
@@ -838,7 +855,12 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
       }
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
       remove(path.c_str());
-      fprintf(stderr, "Comanda %s nu exista!\n", cmd.return_cmd(nr_cmd).c_str());
+      if(special_file==3){
+        fprintf(stderr, "Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
+        else{
+          printf("Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
       exit(EXIT_FAILURE);
   }
   else{
@@ -971,7 +993,12 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
       close(fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
       remove(path.c_str());
-      fprintf(stderr, "Comanda %s nu exista!\n", cmd.return_cmd(nr_cmd).c_str());
+      if(special_file==3){
+        fprintf(stderr, "Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
+        else{
+          printf("Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
       exit(EXIT_FAILURE);
   }
   else{
@@ -1095,7 +1122,12 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
       close(fd);
       execv(cmd.return_path(nr_cmd), cmd.char_convert(nr_cmd));
       remove(path.c_str());
-      fprintf(stderr, "Comanda %s nu exista!\n", cmd.return_cmd(nr_cmd).c_str());
+      if(special_file==3){
+        fprintf(stderr, "Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
+        else{
+          printf("Comanda %s nu exista!", cmd.return_cmd(nr_cmd).c_str());
+        }
       exit(EXIT_FAILURE);
   }
   else{
