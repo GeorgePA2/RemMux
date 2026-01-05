@@ -68,7 +68,7 @@ int main (int argc, char *argv[])
   cbreak();
   remove("my_logs");
   string log_updates;
-  char key='i';
+  int key='i';
   My_Client.curatenie_de_primavara();
   my_windows active_windows;
   string msg;
@@ -76,35 +76,37 @@ int main (int argc, char *argv[])
 
   noecho();
   key = wgetch(active_windows.Get_CurrentWindow());
-  switch (key)
-  {
-  case 10:
-  echo();
-  while(true){
-  log_history(log_updates = "Clientul tasteaza\n");
-  if(My_Client.procesare_cl(argc, argv, connected, active_windows)!=1){
-    wprintw(active_windows.Get_CurrentWindow(), "[Client]A avut loc o eroare in server...\n");
-    active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client]A avut loc o eroare in server...\n");
-    log_history(log_updates = "A avut loc o eroare!\n");
-    connected = 0;
-    break;
-   };
-  wprintw(active_windows.Get_CurrentWindow(),"[Client] Do you want continue? y/n\n");
-  active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client] Do you want continue? y/n\n");
-  wrefresh(active_windows.Get_CurrentWindow());
-  while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
-    noecho();
-    key = wgetch(active_windows.Get_CurrentWindow());
-    echo();
-  }
-  if((key=='n') || (key=='N')){
-    log_history(log_updates = "Am ales sa nu mai continui!\n");
-    break;
-  }
-  else{
-    key='i';
-  }
-  } 
+
+
+  switch (key){
+
+    case 10:
+      echo();
+      while(true){
+        log_history(log_updates = "Clientul tasteaza\n");
+        if(My_Client.procesare_cl(argc, argv, connected, active_windows)!=1){
+            wprintw(active_windows.Get_CurrentWindow(), "[Client]A avut loc o eroare in server...\n");
+            active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client]A avut loc o eroare in server...\n");
+            log_history(log_updates = "A avut loc o eroare!\n");
+            connected = 0;
+            break;
+          };
+        wprintw(active_windows.Get_CurrentWindow(),"[Client] Do you want continue? y/n\n");
+        active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client] Do you want continue? y/n\n");
+        wrefresh(active_windows.Get_CurrentWindow());
+        while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
+          noecho();
+          key = wgetch(active_windows.Get_CurrentWindow());
+          echo();
+        }
+        if((key=='n') || (key=='N')){
+          log_history(log_updates = "Am ales sa nu mai continui!\n");
+          break;
+        }
+        else{
+          key='i';
+        }
+      } 
   break;
 
 
@@ -124,6 +126,10 @@ int main (int argc, char *argv[])
   case '=':
     active_windows.Add_Window();
     log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string(active_windows.Get_nrWindows()) + "\n");
+    break;
+
+  case KEY_RESIZE:
+    active_windows.resize_win();
     break;
 
   default:

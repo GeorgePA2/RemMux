@@ -15,6 +15,7 @@
 #include <vector>
 #include <fcntl.h>
 #include <panel.h>
+#include "my_windows.h"
 
 my_windows::my_windows()
 {
@@ -26,7 +27,18 @@ my_windows::my_windows()
     scrollok(innernew_window, true);
     keypad(innernew_window, true);
     wrefresh(new_window);
+    win_size_info informatii{
+      .startx_inside = (getbegx(stdscr)+1),
+      .starty_inside = getbegy(stdscr)+1,
+      .inside_height = 1,
+      .inside_lenght = 1,
+      .startx_border = getbegx(stdscr),
+      .starty_border = getbegy(stdscr),
+      .border_height = 1,
+      .border_lenght = 1
 
+    };
+    this->sizes.push_back(informatii);
     this->border.push_back(new_window);
     this->inside_box.push_back(innernew_window);
     this->windows_opened = 1;
@@ -38,7 +50,7 @@ my_windows::my_windows()
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
-
+    //this->sizes.push_back{}
 
 }
 
@@ -52,7 +64,7 @@ my_windows::~my_windows()
     }
     string file_history;
     for(int i=0;i<=windows_opened;i++){
-      file_history = "./Client_logs/window" + to_string(i);
+      file_history = "./Client_logs/window" + to_string(getpid()) + "_" + to_string(i);
       remove(file_history.c_str());
     }
 }
@@ -90,7 +102,8 @@ void my_windows::Add_Window()
 {
     int maxx_win, maxy_win, init_x, init_y;
     string logs;
-
+    this->par = 1;
+    this->impar = 1;
     if((windows_opened<max_size) && (windows_opened >=1)){
     
       log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
@@ -101,6 +114,8 @@ void my_windows::Add_Window()
       
       if(windows_opened%2==0){
       Create_Window(maxy_win/2, maxx_win, init_y+maxy_win/2, init_x);
+
+
       }
       else{
         Create_Window(maxy_win, maxx_win/2, init_y, init_x+maxx_win/2);
@@ -181,6 +196,19 @@ void my_windows::Create_Window(int height, int width, int start_y, int start_x)
     wrefresh(innernew_window);
     this->border.push_back(new_window);
     this->inside_box.push_back(innernew_window);
+
+    win_size_info informatii{
+      .startx_inside = (start_x+1),
+      .starty_inside = start_y+1,
+      .inside_height = 1,
+      .inside_lenght = 1,
+      .startx_border = start_x,
+      .starty_border = start_y,
+      .border_height = 1,
+      .border_lenght = 1
+
+    };
+
     this->windows_opened++;
     doupdate();
     string msg;
@@ -189,14 +217,14 @@ void my_windows::Create_Window(int height, int width, int start_y, int start_x)
 
 void my_windows::RestoreWindow(int position)
 {
-    string istoric_fereastra = "./Client_logs/window" + to_string(position);
+    string istoric_fereastra = "./Client_logs/window" + to_string(getpid()) + "_" + to_string(position);
     string err;
     struct stat stbuf;
     wmove(inside_box[position], 0, 0);
     int fd = open(istoric_fereastra.c_str(), O_RDONLY);
     if(fd==-1){
       //perror("ERORARE LA DESCHIDEREA FISIERULUI!");
-      log_history(err= "A avut loc o eroare la deschiderea fisierului window" + to_string(position)+"\n");
+      log_history(err= "A avut loc o eroare la deschiderea fisierului window" + to_string(getpid()) + "_" + to_string(position) +"\n");
       return;
     }
     if(lstat(istoric_fereastra.c_str(), &stbuf)==-1){
@@ -226,7 +254,7 @@ void my_windows::RestoreWindow(int position)
 
 void my_windows::CreateWindowHistory(int position, string &msg)
 {
-        string nume_fisier = "./Client_logs/window" + to_string(position);
+        string nume_fisier = "./Client_logs/window" + to_string(getpid()) + "_" + to_string(position);
         string toerrishuman;
         int fd = open(nume_fisier.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
         if(fd==-1){
@@ -258,3 +286,17 @@ void my_windows::log_history(string &msg)
     msg.clear();
     close(fd);    
 }
+
+void my_windows::resize_win()
+{
+  endwin();
+  initscr();   
+  cbreak();   
+  nonl();   
+  noecho();
+  refresh();
+  string rsz = "RESIZE!!";
+  log_history(rsz);
+}
+
+
