@@ -224,6 +224,8 @@ void my_windows::Create_Window(int height, int width, int start_y, int start_x)
     idlok(innernew_window, true);
     scrollok(innernew_window, true);
     keypad(innernew_window, true);
+
+
     wmove(innernew_window, 0, 0);
     wrefresh(new_window);
     wrefresh(innernew_window);
@@ -313,7 +315,7 @@ void my_windows::log_history(string &msg)
 void my_windows::resize_win()
 {
   cbreak();   
-  nonl();   
+  //nonl();   
   noecho();
   clear();
   refresh();
@@ -367,6 +369,13 @@ void my_windows::resize_win()
   else{
     current_window = 0;
   }
+
+  box(border[current_window], 0, 0);
+  wrefresh(border[current_window]);
+  wrefresh(inside_box[current_window]);
+  touchwin(inside_box[current_window]);
+  wmove(inside_box[current_window], getcury(inside_box[current_window]), getcurx(inside_box[current_window]));
+  doupdate();
   
   refresh();
   log_history(rsz);

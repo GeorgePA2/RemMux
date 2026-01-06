@@ -130,9 +130,16 @@ int main (int argc, char *argv[])
 
   case KEY_RESIZE:
     active_windows.resize_win();
+    log_history(log_updates="resizing...\n");
+    break;
+
+  case -1:
+    log_history(log_updates="RAGE QUIT\n");
+    key = 'q';
     break;
 
   default:
+    log_history(log_updates="Comanda nerecunoscuta" + to_string(key) + "\n");
     break;
   }
 }
