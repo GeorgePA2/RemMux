@@ -70,6 +70,19 @@ my_windows::my_windows()
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
     //this->sizes.push_back{}
 
+    if(!ratios.empty()){
+      ratios.clear();
+    }
+  
+    win_ratio ratie_0{
+      .x_ratio = 0,
+      .y_ratio = 0,
+      .h_ratio = float(getmaxy(this->border[0])) / float(getmaxy(stdscr)),
+      .l_ratio = float(getmaxx(this->border[0])) / float(getmaxx(stdscr))
+    };
+    log_history(logs = to_string(ratie_0.x_ratio) + " " + to_string(ratie_0.y_ratio)+ "\n");
+    this->ratios.push_back(ratie_0);
+
 }
 
 my_windows::~my_windows()
@@ -106,6 +119,7 @@ void my_windows::Change_CurrWin(int nr)
 {
   current_window = nr;
 }
+
 int my_windows::Get_MaxSize()
 {
     return this->max_size;
@@ -199,6 +213,10 @@ void my_windows::Add_Window()
 
 void my_windows::Create_Window(int height, int width, int start_y, int start_x)
 {
+
+
+
+
     WINDOW* new_window = newwin(height, width, start_y, start_x);
     WINDOW* innernew_window = newwin(height-2, width-2, start_y+1, start_x+1);
     box(new_window, 0, 0);
@@ -294,10 +312,10 @@ void my_windows::log_history(string &msg)
 
 void my_windows::resize_win()
 {
-  endwin();
-  initscr();   
   cbreak();   
   nonl();   
+  noecho();
+  clear();
   refresh();
   string rsz = "RESIZE!!";
   
@@ -321,41 +339,36 @@ void my_windows::resize_win()
 
 
   int prev_wincount = windows_opened;
+  int prev_curr_window = current_window;
 
   windows_opened = 0;
   current_window = -1;
 
-  log_history(rsz = "INFORMATII: \n size="
-  + to_string(getmaxx(stdscr)) + ", " + to_string(getmaxy(stdscr)) + "\n");
-
   int start_x = 0;
   int start_y = 0;
-
+  log_history(rsz="INcepem\n");
   for(int i=0;i<prev_wincount;i++){
+    log_history(rsz="Am putut face redimensionarea\n");
     current_window = i;
-    // if((i%2==1) && (i>0)){
-
-    //   this->sizes[i].startx_border = getbegx(this->border[i-1]) + (getmaxx(stdscr) / this->sizes[i-1].border_height);
-    //   this->sizes[i].starty_border = getbegy(this->border[i-1]);
-    // }
-    // else if((i%2==0) && (i>0)){
-    //   this->sizes[i].startx_border = getbegx(this->border[i-1]);
-    //   this->sizes[i].starty_border = getbegy(this->border[i-1]) + (getmaxy(stdscr) / this->sizes[i-1].border_lenght);
-
-    // }
-
-    // Create_Window(getmaxy(stdscr) / this->sizes[i].border_height, getmaxx(stdscr) / this->sizes[i].border_lenght, this->sizes[i].starty_border, this->sizes[i].startx_border);
+    log_history(rsz="shit\n");
+    log_history(rsz="ratii:\n" + to_string(this->ratios[i].x_ratio) + " " + to_string(this->ratios[i].y_ratio)+ "\n");
     start_x = getmaxx(stdscr) * this->ratios[i].x_ratio;
     start_y = getmaxy(stdscr) * this->ratios[i].y_ratio;
+    log_history(rsz="DIMENSIUNI:\n" + to_string(getmaxy(stdscr) * this->ratios[i].h_ratio) + " " + to_string(getmaxx(stdscr) * this->ratios[i].l_ratio)+ "\n");
+    log_history(rsz="START POINT:\n" + to_string(start_y) + " " + to_string(start_x)+ "\n");
 
     Create_Window(getmaxy(stdscr) * this->ratios[i].h_ratio, getmaxx(stdscr) * this->ratios[i].l_ratio, start_y, start_x);
     RestoreWindow(i);
-    // log_history(rsz = "INFORMATII: \n current window: " + to_string(i) + "\n start= " + to_string(this->sizes[i].startx_border) + ", " + to_string(this->sizes[i].starty_border) + "\n size="
-    //   + to_string(this->sizes[i].border_height) + ", " + to_string(this->sizes[i].border_lenght) + "\n");
-
   }
+
+  if(prev_curr_window>=0 && prev_curr_window<windows_opened){
+    current_window = prev_curr_window;
+  }
+  else{
+    current_window = 0;
+  }
+  
   refresh();
   log_history(rsz);
 }
-
 
