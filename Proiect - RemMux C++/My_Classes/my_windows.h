@@ -20,20 +20,18 @@ using namespace std;
 
 class my_windows{
     private:
-    typedef struct win_size_info{
-        int startx_inside, starty_inside;
-        int inside_height, inside_lenght;
-        int startx_border, starty_border;
-        int border_height, border_lenght;
-    }win_size_info;
+    typedef struct win_ratio{
+        float x_ratio, y_ratio;
+        float h_ratio, l_ratio;
+    }win_ratio;
     vector<WINDOW*> inside_box;
     vector<WINDOW*> border;
-    vector<win_size_info> sizes;
+    vector<win_ratio> ratios;
     int current_window=0;
     int windows_opened=0;
     int max_size=6;
-    int par = 1;
-    int impar = 1;
+
+    void ratio_creation();
 
     public:
     my_windows();

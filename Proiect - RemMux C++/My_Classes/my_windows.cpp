@@ -17,6 +17,35 @@
 #include <panel.h>
 #include "my_windows.h"
 
+void my_windows::ratio_creation()
+{
+
+  if(!ratios.empty()){
+    ratios.clear();
+  }
+
+  win_ratio ratie_0{
+    .x_ratio = 0,
+    .y_ratio = 0,
+    .h_ratio = float(getmaxy(this->border[0])) / float(getmaxy(stdscr)),
+    .l_ratio = float(getmaxx(this->border[0])) / float(getmaxx(stdscr))
+  };
+  string msg;
+  log_history(msg = to_string(ratie_0.x_ratio) + " " + to_string(ratie_0.y_ratio)+ "\n");
+  this->ratios.push_back(ratie_0);
+  for(int i=1;i<windows_opened;i++){
+
+    win_ratio ratie{
+      .x_ratio = float(getbegx(this->border[i])) / float(getmaxx(stdscr)),
+      .y_ratio = float(getbegy(this->border[i])) / float(getmaxy(stdscr)),
+      .h_ratio = float(getmaxy(this->border[i])) / float(getmaxy(stdscr)),
+      .l_ratio = float(getmaxx(this->border[i])) / float(getmaxx(stdscr))
+    };
+    this->ratios.push_back(ratie);
+    log_history(msg = to_string(ratie.x_ratio) + " " + to_string(ratie.y_ratio)+ "\n");
+  }
+}
+
 my_windows::my_windows()
 {
     WINDOW* new_window = newwin(getmaxy(stdscr), getmaxx(stdscr), getbegy(stdscr), getbegx(stdscr));
@@ -27,23 +56,12 @@ my_windows::my_windows()
     scrollok(innernew_window, true);
     keypad(innernew_window, true);
     wrefresh(new_window);
-    win_size_info informatii{
-      .startx_inside = (getbegx(stdscr)+1),
-      .starty_inside = getbegy(stdscr)+1,
-      .inside_height = 1,
-      .inside_lenght = 1,
-      .startx_border = getbegx(stdscr),
-      .starty_border = getbegy(stdscr),
-      .border_height = 1,
-      .border_lenght = 1
-
-    };
-    this->sizes.push_back(informatii);
     this->border.push_back(new_window);
     this->inside_box.push_back(innernew_window);
     this->windows_opened = 1;
     this->current_window = 0;
     this->max_size = 6;
+  
     wmove(innernew_window, 0, 0);
     wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n");
     string logs =  "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n";
@@ -102,8 +120,6 @@ void my_windows::Add_Window()
 {
     int maxx_win, maxy_win, init_x, init_y;
     string logs;
-    this->par = 1;
-    this->impar = 1;
     if((windows_opened<max_size) && (windows_opened >=1)){
     
       log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
@@ -114,8 +130,6 @@ void my_windows::Add_Window()
       
       if(windows_opened%2==0){
       Create_Window(maxy_win/2, maxx_win, init_y+maxy_win/2, init_x);
-
-
       }
       else{
         Create_Window(maxy_win, maxx_win/2, init_y, init_x+maxx_win/2);
@@ -179,6 +193,7 @@ void my_windows::Add_Window()
       wrefresh(inside_box[windows_opened-1]);
 
     }
+    ratio_creation();
 
 }
 
@@ -197,17 +212,7 @@ void my_windows::Create_Window(int height, int width, int start_y, int start_x)
     this->border.push_back(new_window);
     this->inside_box.push_back(innernew_window);
 
-    win_size_info informatii{
-      .startx_inside = (start_x+1),
-      .starty_inside = start_y+1,
-      .inside_height = 1,
-      .inside_lenght = 1,
-      .startx_border = start_x,
-      .starty_border = start_y,
-      .border_height = 1,
-      .border_lenght = 1
 
-    };
 
     this->windows_opened++;
     doupdate();
@@ -293,9 +298,63 @@ void my_windows::resize_win()
   initscr();   
   cbreak();   
   nonl();   
-  noecho();
   refresh();
   string rsz = "RESIZE!!";
+  
+  for(auto x:this->border){
+    werase(x);
+    wclear(x);
+    touchwin(x);
+    wrefresh(x);
+    delwin(x);
+  }
+  this->border.clear();
+  for(auto x:this->inside_box){
+    werase(x);
+    wclear(x);
+    touchwin(x);
+    wrefresh(x);
+    delwin(x);
+  }
+  this->inside_box.clear();
+
+
+
+  int prev_wincount = windows_opened;
+
+  windows_opened = 0;
+  current_window = -1;
+
+  log_history(rsz = "INFORMATII: \n size="
+  + to_string(getmaxx(stdscr)) + ", " + to_string(getmaxy(stdscr)) + "\n");
+
+  int start_x = 0;
+  int start_y = 0;
+
+  for(int i=0;i<prev_wincount;i++){
+    current_window = i;
+    // if((i%2==1) && (i>0)){
+
+    //   this->sizes[i].startx_border = getbegx(this->border[i-1]) + (getmaxx(stdscr) / this->sizes[i-1].border_height);
+    //   this->sizes[i].starty_border = getbegy(this->border[i-1]);
+    // }
+    // else if((i%2==0) && (i>0)){
+    //   this->sizes[i].startx_border = getbegx(this->border[i-1]);
+    //   this->sizes[i].starty_border = getbegy(this->border[i-1]) + (getmaxy(stdscr) / this->sizes[i-1].border_lenght);
+
+    // }
+
+    // Create_Window(getmaxy(stdscr) / this->sizes[i].border_height, getmaxx(stdscr) / this->sizes[i].border_lenght, this->sizes[i].starty_border, this->sizes[i].startx_border);
+    start_x = getmaxx(stdscr) * this->ratios[i].x_ratio;
+    start_y = getmaxy(stdscr) * this->ratios[i].y_ratio;
+
+    Create_Window(getmaxy(stdscr) * this->ratios[i].h_ratio, getmaxx(stdscr) * this->ratios[i].l_ratio, start_y, start_x);
+    RestoreWindow(i);
+    // log_history(rsz = "INFORMATII: \n current window: " + to_string(i) + "\n start= " + to_string(this->sizes[i].startx_border) + ", " + to_string(this->sizes[i].starty_border) + "\n size="
+    //   + to_string(this->sizes[i].border_height) + ", " + to_string(this->sizes[i].border_lenght) + "\n");
+
+  }
+  refresh();
   log_history(rsz);
 }
 
