@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <fcntl.h>
+#include <map>
 #include <panel.h>
 
 using namespace std;
@@ -27,11 +28,19 @@ class my_windows{
     vector<WINDOW*> inside_box;
     vector<WINDOW*> border;
     vector<win_ratio> ratios;
+
+    map<int, vector<string>> Window_History;
+    vector<int> current_pos;
+
+
     int current_window=0;
     int windows_opened=0;
     int max_size=6;
 
+    bool enable_log_history;
+
     void ratio_creation();
+    int return_current_line(int window);
 
     public:
     my_windows();
@@ -46,8 +55,11 @@ class my_windows{
     void Create_Window(int height, int width, int start_y, int start_x);
     void RestoreWindow(int position);
     void CreateWindowHistory(int position, string& msg);
+    void scrollup(int window);
+    void scrolldown(int window);
     void log_history(string &msg);
     void resize_win();
+
 
 
 };

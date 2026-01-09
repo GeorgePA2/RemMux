@@ -46,6 +46,14 @@ void my_windows::ratio_creation()
   }
 }
 
+
+int my_windows::return_current_line(int window)
+{
+    int curr_line, aux;
+    getyx(inside_box[window], curr_line, aux);
+    return curr_line;
+}
+
 my_windows::my_windows()
 {
     WINDOW* new_window = newwin(getmaxy(stdscr), getmaxx(stdscr), getbegy(stdscr), getbegx(stdscr));
@@ -61,12 +69,14 @@ my_windows::my_windows()
     this->windows_opened = 1;
     this->current_window = 0;
     this->max_size = 6;
+    this->enable_log_history = true;
   
     wmove(innernew_window, 0, 0);
     wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n");
     string logs =  "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n";
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
+    this->current_pos.push_back(return_current_line(0));
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
     //this->sizes.push_back{}
 
@@ -205,9 +215,12 @@ void my_windows::Add_Window()
       wrefresh(inside_box[windows_opened-2]);
       wrefresh(border[windows_opened-1]);
       wrefresh(inside_box[windows_opened-1]);
+      this->current_pos.push_back(return_current_line(current_window));
+      this->current_pos[current_window-1] = return_current_line(current_window-1);
 
     }
     ratio_creation();
+
 
 }
 
@@ -242,64 +255,47 @@ void my_windows::Create_Window(int height, int width, int start_y, int start_x)
 
 void my_windows::RestoreWindow(int position)
 {
-    string istoric_fereastra = "./Client_logs/window" + to_string(getpid()) + "_" + to_string(position);
     string err;
-    struct stat stbuf;
+    int start = 0;
+    if((int)Window_History[position].size()>100){
+      start = (int)Window_History[position].size()-100;
+    }
+    log_history(err="start = " + to_string(start) + "\n");
     wmove(inside_box[position], 0, 0);
-    int fd = open(istoric_fereastra.c_str(), O_RDONLY);
-    if(fd==-1){
-      //perror("ERORARE LA DESCHIDEREA FISIERULUI!");
-      log_history(err= "A avut loc o eroare la deschiderea fisierului window" + to_string(getpid()) + "_" + to_string(position) +"\n");
-      return;
+
+    for(; start < (int)Window_History[position].size(); start++) {
+      wprintw(inside_box[position], "%s", Window_History[position][start].c_str());
     }
-    if(lstat(istoric_fereastra.c_str(), &stbuf)==-1){
-      //perror("EROARE LA lstat!");
-      log_history(err = "EROARE LA lstat!");
-      return;
-    }
-  
-    int file_size = stbuf.st_size;
-    char istory[file_size+1];
-  
-    if(read(fd, istory, file_size)==-1){
-      //perror("EROARE LA CITIRE DIN FISIER!");
-      log_history(err = "EROARE LA CITIREA DIN FISIERUL window"+to_string(position)+"\n");
-      return;
-    }
-    istory[file_size] = '\0';
-    wprintw(inside_box[position], "%s", istory);
-    istoric_fereastra.clear();
     err.clear();
     wrefresh(border[position]);
     wrefresh(inside_box[position]);
-    close(fd);
 }
 
 
 
 void my_windows::CreateWindowHistory(int position, string &msg)
 {
-        string nume_fisier = "./Client_logs/window" + to_string(getpid()) + "_" + to_string(position);
         string toerrishuman;
-        int fd = open(nume_fisier.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
-        if(fd==-1){
-          //perror("ERORARE LA CITIREA/CREEREA FISIERULUI!");
-          log_history(toerrishuman = "A avut loc o eroare la creerea fisierului window" + to_string(position)+"\n");
-          return;
-        }
-        if(write(fd, msg.c_str(), msg.size())==-1){
-          //perror("EROARE LA SCRIEREA PE FISIER!");
-          log_history(toerrishuman = "A avut loc o eroare la scrierea pe fisierul window" + to_string(position)+"\n");
-          return;
-        }
+        log_history(toerrishuman="Clientul a primit mesajul" + msg + "\n");
+        this->Window_History[position].push_back(msg);
         msg.clear();
-        nume_fisier.clear();
         toerrishuman.clear();
-        close(fd);
+}
+
+void my_windows::scrollup(int window)
+{
+  string err;
+  int start = 0;
+  wmove(inside_box[window], 0, 0);
+
 }
 
 void my_windows::log_history(string &msg)
 {
+    if(enable_log_history==false){
+      return;
+    }
+    else{
     int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
     if(fd==-1){
         //perror("EROARE LA DESCHIDEREA FISIERULUI!");
@@ -310,6 +306,7 @@ void my_windows::log_history(string &msg)
     }
     msg.clear();
     close(fd);    
+  }
 }
 
 void my_windows::resize_win()
@@ -320,6 +317,7 @@ void my_windows::resize_win()
   clear();
   refresh();
   string rsz = "RESIZE!!";
+
   
   for(auto x:this->border){
     werase(x);
@@ -348,19 +346,23 @@ void my_windows::resize_win()
 
   int start_x = 0;
   int start_y = 0;
-  log_history(rsz="INcepem\n");
+  this->enable_log_history = false;
+  //log_history(rsz="INcepem\n");
   for(int i=0;i<prev_wincount;i++){
-    log_history(rsz="Am putut face redimensionarea\n");
+    //log_history(rsz="Am putut face redimensionarea\n");
     current_window = i;
-    log_history(rsz="shit\n");
-    log_history(rsz="ratii:\n" + to_string(this->ratios[i].x_ratio) + " " + to_string(this->ratios[i].y_ratio)+ "\n");
+    //log_history(rsz="shit\n");
+    //log_history(rsz="ratii:\n" + to_string(this->ratios[i].x_ratio) + " " + to_string(this->ratios[i].y_ratio)+ "\n");
     start_x = getmaxx(stdscr) * this->ratios[i].x_ratio;
     start_y = getmaxy(stdscr) * this->ratios[i].y_ratio;
-    log_history(rsz="DIMENSIUNI:\n" + to_string(getmaxy(stdscr) * this->ratios[i].h_ratio) + " " + to_string(getmaxx(stdscr) * this->ratios[i].l_ratio)+ "\n");
-    log_history(rsz="START POINT:\n" + to_string(start_y) + " " + to_string(start_x)+ "\n");
+   // log_history(rsz="DIMENSIUNI:\n" + to_string(getmaxy(stdscr) * this->ratios[i].h_ratio) + " " + to_string(getmaxx(stdscr) * this->ratios[i].l_ratio)+ "\n");
+    //log_history(rsz="START POINT:\n" + to_string(start_y) + " " + to_string(start_x)+ "\n");
 
     Create_Window(getmaxy(stdscr) * this->ratios[i].h_ratio, getmaxx(stdscr) * this->ratios[i].l_ratio, start_y, start_x);
     RestoreWindow(i);
+    this->current_pos[i] = return_current_line(i);
+    this->enable_log_history = true;
+    log_history(rsz = "ultima linie: " + to_string(current_pos[i]) + "\n");
   }
 
   if(prev_curr_window>=0 && prev_curr_window<windows_opened){
@@ -378,6 +380,8 @@ void my_windows::resize_win()
   doupdate();
   
   refresh();
-  log_history(rsz);
+  this->enable_log_history = true;
+  //log_history(rsz);
+
 }
 

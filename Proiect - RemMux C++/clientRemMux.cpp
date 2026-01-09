@@ -95,6 +95,12 @@ int main (int argc, char *argv[])
         active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client] Do you want continue? y/n\n");
         wrefresh(active_windows.Get_CurrentWindow());
         while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
+          
+          if (key==KEY_RESIZE){
+            active_windows.resize_win();
+            log_history(log_updates="resizing...\n");
+           }
+
           noecho();
           key = wgetch(active_windows.Get_CurrentWindow());
           echo();

@@ -51,10 +51,10 @@ void handle_execution(Commandments cmd);
 void exec_sg_cmd(Commandments my_command, string filename);
 
 
-void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
+bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
 void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int special_file);
-void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
-void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
+bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
+bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, string output);
 void Redirect_SingleOutput(string OG_file, string output);
 
 bool valid_output(string file);
@@ -527,20 +527,23 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
 
       case 1:
           printf("[DEBUG]Output is : %s\n", output.c_str());
-          AND_oftheworld(command, nr_cmd, filename_temp, special_operation, output);
+          if(AND_oftheworld(command, nr_cmd, filename_temp, special_operation, output)==true){
           lastfile = output;
+          }
           break;
 
       case 2:
           printf("[DEBUG]Output is : %s\n", output.c_str());
-          ORwell(command, nr_cmd, filename_temp, special_operation, output);
+          if(ORwell(command, nr_cmd, filename_temp, special_operation, output)==true){
           lastfile = output;
+          }
           break;
 
       case 3:
           printf("[DEBUG]Output is : %s\n", output.c_str());
-          DotCom(command, nr_cmd, filename_temp, special_operation, output);
+          if(DotCom(command, nr_cmd, filename_temp, special_operation, output)==true){
           lastfile = output;
+          }
           break;
 
       case 4:{
@@ -559,7 +562,12 @@ void executa_mult_cmd(Commandments command, string filename, string filename_tem
           break;
       }
 
-      nr_cmd += special_operation + 1;
+      if(special_operation>0){
+        nr_cmd += 2;
+      }
+      else{
+        nr_cmd++;
+      }
       operatie = command.return_operation(nr_cmd);
       printf("[DEBUG]Operatia este: %d\n[DEBUG]Nr CMD este: %d\n", operatie, nr_cmd);
   }
@@ -744,14 +752,14 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
 
 }
 
-void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
+bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
 
   string path = cmd.file_path();
   int file_exists = open(path.c_str(), O_RDONLY);
   printf("%s\n", path.c_str());
   if(file_exists==-1){
     printf("[DEBUG]COMANDA ANTERIOARA A ESUAT!\n");
-    return;
+    return false;
   }
   close(file_exists);
   int fd;
@@ -774,7 +782,7 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
   else{
@@ -801,7 +809,7 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
 
@@ -819,7 +827,7 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
     printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
   }
@@ -881,10 +889,12 @@ void AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
 
   }
 
+  return true;
+
 
 }
 
-void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
+bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
 
 
 
@@ -893,7 +903,7 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
   printf("%s\n", path.c_str());
   if(file_exists!=-1){
     printf("COMANDA ANTERIOARA NU A ESUAT!");
-    return;
+    return false;
   }
   close(file_exists);
 
@@ -922,7 +932,7 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
   else{
@@ -947,7 +957,7 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
     printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
   }
@@ -968,7 +978,7 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
 
@@ -1019,10 +1029,12 @@ void ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
 
   }
 
+  return true;
+
 
 }
 
-void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
+bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, string output){
 
 
 
@@ -1050,7 +1062,7 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
   else{
@@ -1075,7 +1087,7 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
     printf("[DEBUG] FIla %s a putut fi deschisa!\n", output.c_str());
   }
@@ -1096,7 +1108,7 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
         exit(EXIT_FAILURE);
       }
       close(fd_trunc);
-      return;
+      return true;
     }
   }
 
@@ -1147,6 +1159,8 @@ void DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
 
 
   }
+
+  return true;
 
 
 }
