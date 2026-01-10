@@ -138,6 +138,14 @@ int main (int argc, char *argv[])
     active_windows.resize_win();
     log_history(log_updates="resizing...\n");
     break;
+  
+  case KEY_UP:
+    active_windows.scrollup(active_windows.Get_CurrentW());
+    break;
+
+  case KEY_DOWN:
+    active_windows.scrolldown(active_windows.Get_CurrentW());
+    break;
 
   case -1:
     log_history(log_updates="RAGE QUIT\n");
@@ -287,9 +295,9 @@ int procesare_client(int argc, char *argv[], int &connected, my_windows& win){
   signal(SIGPIPE, SIG_IGN);
 
   
-  wprintw (win.Get_CurrentWindow(),"[Server]%s\n", raspuns);
+  wprintw (win.Get_CurrentWindow(),"[Server]%s", raspuns);
   string temp = raspuns;
-  msg = "[Server] " + temp + " \n";
+  msg = "[Server] " + temp;
   temp.clear();
   win.CreateWindowHistory(win.Get_CurrentW(), msg);
   log_history(msg);
