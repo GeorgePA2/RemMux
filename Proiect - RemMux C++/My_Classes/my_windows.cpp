@@ -54,6 +54,57 @@ int my_windows::return_current_line(int window)
     return curr_line;
 }
 
+int my_windows::return_totalLines(int window)
+{
+  enable_log_history = true;
+  int line_count = 0;
+
+  int i =0;
+  for(const auto & x:Window_History[window]){
+    string log = x;
+    log_history(log += to_string(i) + "\n");
+    line_count += x.size() / (int)getmaxx(inside_box[window]) + 1;
+    i++;
+  }
+  return line_count;
+
+}
+
+void my_windows::splitup_MSG(vector<string> &lines, string msg, int curr_window)
+{
+  string new_line;
+  for(int i=0;i<(int)msg.size();i++){
+    new_line += msg[i];
+    if(msg[i]=='\n'){
+      lines.push_back(new_line);
+      new_line.clear();
+    }
+    if((int)new_line.size()==getmaxx(inside_box[curr_window])){
+      lines.push_back(new_line);
+      new_line.clear();
+    }
+  }
+  if(!new_line.empty()){
+    lines.push_back(new_line);
+    new_line.clear();
+  }
+}
+
+void my_windows::splitup_MSG_Restore(vector<string> &lines, string &new_line, string msg, int curr_window)
+{
+  for(int i=0;i<(int)msg.size();i++){
+    new_line += msg[i];
+    if(msg[i]=='\n'){
+      lines.push_back(new_line);
+      new_line.clear();
+    }
+    if((int)new_line.size()==getmaxx(inside_box[curr_window])){
+      lines.push_back(new_line);
+      new_line.clear();
+    }
+  }
+}
+
 my_windows::my_windows()
 {
     WINDOW* new_window = newwin(getmaxy(stdscr), getmaxx(stdscr), getbegy(stdscr), getbegx(stdscr));
@@ -74,6 +125,11 @@ my_windows::my_windows()
     wmove(innernew_window, 0, 0);
     wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n");
     string logs =  "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n";
+
+    this->total_lines.push_back(0);
+
+    this->total_chars.push_back((int)logs.size());
+
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
     this->current_pos.push_back(return_current_line(0));
@@ -142,6 +198,8 @@ void my_windows::Change_MaxSize(int new_size)
 
 void my_windows::Add_Window()
 {
+    this->total_chars.push_back(0);
+    this->total_lines.push_back(0);
     int maxx_win, maxy_win, init_x, init_y;
     string logs;
     if((windows_opened<max_size) && (windows_opened >=1)){
@@ -227,9 +285,6 @@ void my_windows::Add_Window()
 void my_windows::Create_Window(int height, int width, int start_y, int start_x)
 {
 
-
-
-
     WINDOW* new_window = newwin(height, width, start_y, start_x);
     WINDOW* innernew_window = newwin(height-2, width-2, start_y+1, start_x+1);
     box(new_window, 0, 0);
@@ -257,8 +312,29 @@ void my_windows::RestoreWindow(int position)
 {
     string err;
     int start = 0;
-    if((int)Window_History[position].size()>100){
-      start = (int)Window_History[position].size()-100;
+
+    string new_line;
+    vector<string> lines;
+    total_lines[position] = 0;
+    for(const auto& x:Window_History[position]){
+      splitup_MSG_Restore(lines, new_line, x, position);
+      if((int)lines.size() > MAX_HISTORY){
+        lines.erase(lines.begin());
+      }
+    }
+    if(!new_line.empty()){
+      lines.push_back(new_line);
+      new_line.clear();
+    }
+    total_lines[position] = (int)lines.size();
+
+    Window_History[position].clear();
+    for(const auto& l:lines){
+      Window_History[position].push_back(l);
+    }
+
+    if((int)Window_History[position].size()>(int)getmaxy(inside_box[position])){
+      start = (int)Window_History[position].size()-(int)getmaxy(inside_box[position]);
     }
     log_history(err="start = " + to_string(start) + "\n");
     wmove(inside_box[position], 0, 0);
@@ -277,7 +353,23 @@ void my_windows::CreateWindowHistory(int position, string &msg)
 {
         string toerrishuman;
         log_history(toerrishuman="Clientul a primit mesajul" + msg + "\n");
-        this->Window_History[position].push_back(msg);
+
+        vector<string> lines;
+
+        splitup_MSG(lines, msg, position);
+
+        for(const auto& x: lines){
+        this->Window_History[position].push_back(x);
+        this->total_lines[position]++;
+
+        if(total_lines[position] > MAX_HISTORY){
+          total_lines[position]--;
+          Window_History[position].erase(Window_History[position].begin());
+        }
+
+        }
+
+        this->total_chars[position] += (int)msg.size();
         msg.clear();
         toerrishuman.clear();
 }
@@ -287,15 +379,12 @@ void my_windows::scrollup(int window)
   string err;
   int start = 0;
   wmove(inside_box[window], 0, 0);
+  
 
 }
 
 void my_windows::log_history(string &msg)
 {
-    if(enable_log_history==false){
-      return;
-    }
-    else{
     int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
     if(fd==-1){
         //perror("EROARE LA DESCHIDEREA FISIERULUI!");
@@ -306,7 +395,7 @@ void my_windows::log_history(string &msg)
     }
     msg.clear();
     close(fd);    
-  }
+  
 }
 
 void my_windows::resize_win()
@@ -363,6 +452,8 @@ void my_windows::resize_win()
     this->current_pos[i] = return_current_line(i);
     this->enable_log_history = true;
     log_history(rsz = "ultima linie: " + to_string(current_pos[i]) + "\n");
+    log_history(rsz = "Numarul total de caractere la fereastra:" + to_string(i)  + "este " + to_string(total_chars[i]) + "\n");
+    log_history(rsz = "Numarul total de linii curent:" + to_string(total_lines[i]) + "\n");
   }
 
   if(prev_curr_window>=0 && prev_curr_window<windows_opened){

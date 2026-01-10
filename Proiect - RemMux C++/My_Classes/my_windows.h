@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <map>
 #include <panel.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -31,16 +32,23 @@ class my_windows{
 
     map<int, vector<string>> Window_History;
     vector<int> current_pos;
+    vector<int> last_pos; 
+    vector<int> total_chars;
+    vector<int> total_lines;
 
 
     int current_window=0;
     int windows_opened=0;
     int max_size=6;
+    int MAX_HISTORY = 1000;
 
     bool enable_log_history;
 
     void ratio_creation();
     int return_current_line(int window);
+    int return_totalLines(int window);
+    void splitup_MSG(vector<string> &lines, string msg, int curr_window);
+    void splitup_MSG_Restore(vector<string> &lines, string &new_line, string msg, int curr_window);
 
     public:
     my_windows();
@@ -59,6 +67,7 @@ class my_windows{
     void scrolldown(int window);
     void log_history(string &msg);
     void resize_win();
+
 
 
 
