@@ -129,10 +129,9 @@ my_windows::my_windows()
     this->total_lines.push_back(0);
 
     this->total_chars.push_back((int)logs.size());
-
+    this->current_pos.push_back(0);
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
-    this->current_pos.push_back(return_current_line(0));
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
     //this->sizes.push_back{}
 
@@ -200,6 +199,7 @@ void my_windows::Add_Window()
 {
     this->total_chars.push_back(0);
     this->total_lines.push_back(0);
+    this->current_pos.push_back(0);
     int maxx_win, maxy_win, init_x, init_y;
     string logs;
     if((windows_opened<max_size) && (windows_opened >=1)){
@@ -273,9 +273,10 @@ void my_windows::Add_Window()
       wrefresh(inside_box[windows_opened-2]);
       wrefresh(border[windows_opened-1]);
       wrefresh(inside_box[windows_opened-1]);
-      this->current_pos.push_back(return_current_line(current_window));
-      this->current_pos[current_window-1] = return_current_line(current_window-1);
 
+      this->current_pos[current_window-1] = return_current_line(current_window-1);
+      log_history(logs = "Window " + to_string(current_window) + + "Are " + to_string(current_pos[current_window]) + "Linii\n");
+      log_history(logs = "Window " + to_string(current_window-1) + + "Are " + to_string(current_pos[current_window-1]) + "Linii\n");
     }
     ratio_creation();
 
@@ -372,6 +373,8 @@ void my_windows::CreateWindowHistory(int position, string &msg)
         this->total_chars[position] += (int)msg.size();
         msg.clear();
         toerrishuman.clear();
+        this->current_pos[position] = return_current_line(position);
+        log_history(toerrishuman = "Window " + to_string(current_window) + + "Are " + to_string(current_pos[current_window]) + "Linii\n");
 }
 
 void my_windows::scrollup(int window)
@@ -387,17 +390,22 @@ void my_windows::scrollup(int window)
   touchwin(inside_box[window]);
   wrefresh(inside_box[window]);
   wmove(inside_box[window], 0, 0);
+  log_history(err = "Stergere completa!\n");
   if(current_pos[window]>0){
     current_pos[window]--;
   }
   string position = "current pos = " + to_string(current_pos[window]) + "\n";
   log_history(position);
-  if(current_pos[window]>getmaxy(inside_box[window])){
-    start = Window_History[window].size()-getmaxy(inside_box[window]);
-  }
-  else if ((int)Window_History[window].size() - current_pos[window] > getmaxy(inside_box[window]))
+
+  start = Window_History[window].size()-getmaxy(inside_box[window]);
+  if ((int)Window_History[window].size() - current_pos[window] > getmaxy(inside_box[window]))
   {
     start = current_pos[window];
+  }
+
+
+  if(start<0){
+    start = 0;
   }
 
   position.clear();
@@ -405,10 +413,12 @@ void my_windows::scrollup(int window)
   log_history(position);
 
   for(int i=0;i<getmaxy(inside_box[window]);i++){
-    if(start+i>(int)Window_History[window].size()){
+    if(start+i>=(int)Window_History[window].size()){
       break;
     }
+    log_history(err = "Incercam sa printam pe pozitia" + to_string(start+i) + "\n");
     if(start+i==current_pos[window]){
+
       wattron(inside_box[window], A_REVERSE);
       wprintw(inside_box[window], "%s", Window_History[window][start+i].c_str());
       wattroff(inside_box[window], A_REVERSE);
@@ -441,12 +451,14 @@ void my_windows::scrolldown(int window)
   }
   string position = "current pos = " + to_string(current_pos[window]) + "\n";
   log_history(position);
-  if(current_pos[window]>getmaxy(inside_box[window])){
-    start = Window_History[window].size()-getmaxy(inside_box[window]);
-  }
-  else if ((int)Window_History[window].size() - current_pos[window] > getmaxy(inside_box[window]))
+  start = Window_History[window].size()-getmaxy(inside_box[window]);
+  if ((int)Window_History[window].size() - current_pos[window] > getmaxy(inside_box[window]))
   {
     start = current_pos[window];
+  }
+
+  if(start<0){
+    start = 0;
   }
 
   position.clear();
@@ -454,7 +466,7 @@ void my_windows::scrolldown(int window)
   log_history(position);
 
   for(int i=0;i<getmaxy(inside_box[window]);i++){
-    if(start+i>(int)Window_History[window].size()){
+    if(start+i>=(int)Window_History[window].size()){
       break;
     }
     if(start+i==current_pos[window]){
