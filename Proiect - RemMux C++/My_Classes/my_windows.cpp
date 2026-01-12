@@ -130,6 +130,7 @@ my_windows::my_windows()
 
     this->total_chars.push_back((int)logs.size());
     this->current_pos.push_back(0);
+    this->last_pos.push_back(0);
     CreateWindowHistory(this->current_window, logs);
     wrefresh(inside_box[current_window]);
     log_history(logs = "Avem " + to_string(windows_opened) + " ferestre active!\n");
@@ -373,8 +374,9 @@ void my_windows::CreateWindowHistory(int position, string &msg)
         this->total_chars[position] += (int)msg.size();
         msg.clear();
         toerrishuman.clear();
-        this->current_pos[position] = return_current_line(position);
+        this->current_pos[position] = (int)Window_History[position].size();
         log_history(toerrishuman = "Window " + to_string(current_window) + + "Are " + to_string(current_pos[current_window]) + "Linii\n");
+        this->last_pos[position] = getcury(inside_box[position]);
 }
 
 void my_windows::scrollup(int window)
@@ -396,10 +398,10 @@ void my_windows::scrollup(int window)
   }
   string position = "current pos = " + to_string(current_pos[window]) + "\n";
   log_history(position);
-
-  start = Window_History[window].size()-getmaxy(inside_box[window]);
-  if ((int)Window_History[window].size() - current_pos[window] > getmaxy(inside_box[window]))
+  start = Window_History[window].size() - last_pos[window];
+  if (current_pos[window] < start)
   {
+    log_history(position = "Start nou\n");
     start = current_pos[window];
   }
 
@@ -411,14 +413,20 @@ void my_windows::scrollup(int window)
   position.clear();
   position = "current start = " + to_string(start) + "\n";
   log_history(position);
-
+  position.clear();
+  position = "ar fi trebuit sa avem " + to_string((int)Window_History.size()-start) + "linii\n";
+  log_history(position);
   for(int i=0;i<getmaxy(inside_box[window]);i++){
     if(start+i>=(int)Window_History[window].size()){
+
       break;
     }
-    log_history(err = "Incercam sa printam pe pozitia" + to_string(start+i) + "\n");
-    if(start+i==current_pos[window]){
+    //log_history(err = "Incercam sa printam pe pozitia" + to_string(start+i) + "\n");
 
+    if(start+i==current_pos[window]){
+      position.clear();
+      position = "Highlight: " + to_string(start + i) + "vs" + to_string(current_pos[window]) + "\n";
+      log_history(position);
       wattron(inside_box[window], A_REVERSE);
       wprintw(inside_box[window], "%s", Window_History[window][start+i].c_str());
       wattroff(inside_box[window], A_REVERSE);
@@ -428,7 +436,6 @@ void my_windows::scrollup(int window)
     }
   }
 }
-  
 
 }
 
@@ -466,10 +473,16 @@ void my_windows::scrolldown(int window)
   log_history(position);
 
   for(int i=0;i<getmaxy(inside_box[window]);i++){
+
     if(start+i>=(int)Window_History[window].size()){
       break;
     }
+
+
     if(start+i==current_pos[window]){
+      position.clear();
+      position = "Highlight: " + to_string(start + i) + "vs" + to_string(current_pos[window]) + "\n";
+      log_history(position);
       wattron(inside_box[window], A_REVERSE);
       wprintw(inside_box[window], "%s", Window_History[window][start+i].c_str());
       wattroff(inside_box[window], A_REVERSE);
@@ -479,6 +492,8 @@ void my_windows::scrolldown(int window)
     }
   }
 }
+
+this->last_pos[window] = getcury(inside_box[window]);
   
 
 }
@@ -551,7 +566,7 @@ void my_windows::resize_win()
 
     Create_Window(getmaxy(stdscr) * this->ratios[i].h_ratio, getmaxx(stdscr) * this->ratios[i].l_ratio, start_y, start_x);
     RestoreWindow(i);
-    this->current_pos[i] = return_current_line(i);
+    this->last_pos[i] = getcury(inside_box[i]);
     this->enable_log_history = true;
     log_history(rsz = "ultima linie: " + to_string(current_pos[i]) + "\n");
     log_history(rsz = "Numarul total de caractere la fereastra:" + to_string(i)  + "este " + to_string(total_chars[i]) + "\n");

@@ -27,6 +27,7 @@ private:
     vector<int> ordinea_operatiilor;
     int total_commands = 0;
     string succes_path;
+    vector<string> previous_directory;
 public:
     Commandments(const char* cmd);
     ~Commandments();
@@ -35,7 +36,11 @@ public:
     char* return_path(int nr_cmd);
     int return_operation(int nr_cmd);
     string return_cmd(int nr_cmd);
+    vector<string> return_cmd_separat(int nr_cmd);
     bool is_next_file(int nr_cmd);
     string file_path();
-    void creeate_path(string file);
+    void creeate_path(string file, string absolute_path);
+    string detect_custom_cmd(int nr_cmd);
+    void change_prv_directory(string dir);
+    string return_prv_directory();
 };

@@ -141,10 +141,12 @@ int main (int argc, char *argv[])
   
   case KEY_UP:
     active_windows.scrollup(active_windows.Get_CurrentW());
+    log_history(log_updates = "Scrolling up in window" + to_string(active_windows.Get_nrWindows()) + "\n");
     break;
 
   case KEY_DOWN:
     active_windows.scrolldown(active_windows.Get_CurrentW());
+    log_history(log_updates = "Scrolling down in window" + to_string(active_windows.Get_nrWindows()) + "\n");
     break;
 
   case -1:

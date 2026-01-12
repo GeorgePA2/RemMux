@@ -23,7 +23,7 @@ vector<string> separate_inside(string cmd);
 
 Commandments::Commandments(const char *cmd)
 {
-    this->succes_path = "./Success/";
+    this->succes_path = "/Success/";
     this->total_commands = 0;
     string cmd_str;
     info_operatii op_info = op_type(cmd, 0);
@@ -107,6 +107,11 @@ string Commandments::return_cmd(int nr_cmd)
     return this->Commands[nr_cmd-1];
 }
 
+vector<string> Commandments::return_cmd_separat(int nr_cmd)
+{
+    return this->Comenzi_separate[nr_cmd-1];
+}
+
 bool Commandments::is_next_file(int nr_cmd)
 {
     if(nr_cmd>0 && nr_cmd<GetTotalCMDs()){
@@ -125,11 +130,37 @@ string Commandments::file_path()
     return this->succes_path;
 }
 
-void Commandments::creeate_path(string file)
+void Commandments::creeate_path(string file, string absolute_path)
 {
-  this->succes_path += file;
+  string copy = this->succes_path;
+  this->succes_path = absolute_path + copy + file;
 }
 
+string Commandments::detect_custom_cmd(int nr_cmd)
+{
+  vector<string> Comenzi_Custom = {"cd"};
+
+  for(int i=0;i<(int)Comenzi_Custom.size();i++){
+    long unsigned int gasit = this->Commands[nr_cmd-1].find(Comenzi_Custom[i], 0);
+    if(gasit!=string::npos){
+        return Comenzi_Custom[i];
+    }
+  }
+  return "N/A";
+
+}
+
+void Commandments::change_prv_directory(string dir)
+{
+  previous_directory.push_back(dir);
+}
+
+string Commandments::return_prv_directory()
+{
+    string prev_dir = previous_directory[(int)previous_directory.size()-1];
+    previous_directory.pop_back();
+    return prev_dir;
+}
 
 string separa_comenzi(const char* cmd, int pozitie_start, int pozitie_finala){
     string cmd_str;
