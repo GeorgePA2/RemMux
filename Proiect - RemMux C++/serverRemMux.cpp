@@ -16,6 +16,8 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fstream>
+#include <signal.h>
+
 
 
 #define PORT 2908
@@ -26,9 +28,10 @@ extern int errno;
 typedef struct thData{
 	int idThread; 
 	int cl; 
-  string abs_filename;
+
 }thData;
 
+string abs_filename;
 
 
 typedef struct Protocol
@@ -63,6 +66,36 @@ bool valid_output(string file);
 bool custom_cd(vector<string> arguments, string filename, int special_file, string output, Commandments &cmd);
 bool proceseaza_custom_cmd(Commandments cmd, int nr_cmd ,string filename, int special_file, string output);
 
+bool timeout(pid_t proces, int &status, int timeout_timer){
+  int seconds_passed = 0;
+  while(true){
+    pid_t result = waitpid(proces, &status, WNOHANG);
+    if(result==proces){
+      printf("[DEBUG]Gata!\n");
+      return true;
+      break;
+    }
+    else if (result==-1)
+    {
+      perror("ERORARE LA ASTEPTAREA PROCESULUI!");
+      printf("[DEBUG]Gata!\n");
+      return false;
+      break; 
+    }
+    if(seconds_passed>=timeout_timer*1000){
+      kill(-proces, SIGKILL);
+      waitpid(proces, &status, 0);
+      return false;
+    }
+    if(result==0){
+     // printf("[DEBUG]Goodnight sleep!\n");
+      usleep(100000);
+  }
+    seconds_passed += 100;
+    //printf("[DEBUG]Au trecut%d secunde!\n", seconds_passed);
+  }
+}
+
 
 Protocol MyProtocol{
   .executa = exec_cmd,
@@ -76,6 +109,7 @@ int main ()
   int sd;		
   pthread_t th[100];   
 	int i=0;
+  mkdir("./Files", 0777);
   
 
 
@@ -220,9 +254,9 @@ void exec_cmd(const char* cmd, void* arg){
     perror("EROARE getcwd!");
     return;
   }
-  tdL.abs_filename = string(current_dir);
-  string filename = tdL.abs_filename +  "/Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
-  command.creeate_path("temp_" + to_string(getpid()) + "_" + to_string(pthread_self()), tdL.abs_filename);
+  abs_filename = string(current_dir);
+  string filename = abs_filename +  "/Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
+  command.creeate_path("temp_" + to_string(getpid()) + "_" + to_string(pthread_self()), abs_filename);
 
   int file_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
   if(file_fd==-1){
@@ -268,14 +302,11 @@ void exec_cmd(const char* cmd, void* arg){
 void return2cl(void* arg, int is_err){
 	struct thData tdL; 
 	tdL= *((struct thData*)arg);
-  char current_dir[4096];
-  if (!getcwd(current_dir, sizeof(current_dir))) {
-    perror("EROARE getcwd!");
-    return;
-  }
 
-  string filename = tdL.abs_filename + "/Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
+  string filename = abs_filename + "/Files/temp_" + to_string(getpid()) + "_" + to_string(pthread_self());
   int sizeofmsg;
+
+  printf("[DEBUG] Filename is: %s\n", filename.c_str());
 
   if(is_err==1){
     char mesaj_de_eroare[] = "Eroare! Comanda inexistenta!";
@@ -357,13 +388,12 @@ void exec_sg_cmd(Commandments my_command, string filename){
 
   printf("Nu am avut comanda custom!\n");
   int status = 0;
-  pid_t asteptare_fiu;
-
   if((executare_comanda=fork())==-1){
       perror("ERORARE LA CREEREA PROCESULUI!");
       return;
   }
   if(executare_comanda==0){
+    setpgid(0, 0); 
     dup2(file_fd, 1); 
     close(fd);
     close(file_fd);
@@ -375,8 +405,16 @@ void exec_sg_cmd(Commandments my_command, string filename){
   {   
 
 
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1");}
+
+      bool fiul_asteptator = timeout(executare_comanda, status, 5);
+      if(fiul_asteptator==false){
+
+        string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+        if((write(file_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+          perror("ERORARE LA TIMEOUT!");
+          exit(EXIT_FAILURE);
+        }
+      }
 
       struct stat stbuf;
       if(lstat(filename_temp.c_str(), &stbuf)==-1){
@@ -409,7 +447,7 @@ void exec_sg_cmd(Commandments my_command, string filename){
         delete[] temp;
       }
       else{
-        char mesaj_generic[] = "Comanda a fost executata cu succes!";
+        char mesaj_generic[] = "Comanda a fost executata cu succes!\n";
         file_size = strlen(mesaj_generic)+1;
         if(write(fd, &file_size, sizeof(file_size))<0){
           perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
@@ -482,7 +520,7 @@ void exec_sg_cmd(Commandments my_command, string filename){
       delete[] temp;
     }
     else{
-      char mesaj_generic[] = "Comanda a fost executata cu succes!";
+      char mesaj_generic[] = "Comanda a fost executata cu succes!\n";
       file_size = strlen(mesaj_generic)+1;
       if(write(fd, &file_size, sizeof(file_size))<0){
         perror("EROARE LA SCRIEREA BITILOR IN FISIER!");
@@ -510,6 +548,7 @@ void exec_sg_cmd(Commandments my_command, string filename){
 void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, string input, int special_cmd){
 
 
+  if(my_command.detect_custom_cmd(nr_cmd)=="N/A"){
   int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
   if(fd==-1){
     perror("EROARE! FISIER INEXISTENT! GO BACK!");
@@ -543,7 +582,6 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, stri
   }
 
   int status = 0;
-  pid_t asteptare_fiu;
   pid_t executare_comanda;
   string path = my_command.file_path();
   printf("fila: %s\n", path.c_str());
@@ -552,6 +590,7 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, stri
       perror("ERORARE LA CREEREA PROCESULUI!");
   }
   if(executare_comanda==0){
+    setpgid(0, 0);
     dup2(fd, 1); 
     close(fd);
     if(special_cmd==1){
@@ -574,8 +613,18 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, stri
   }
   else
   {   
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+    bool fiul_asteptator = timeout(executare_comanda, status, 5);
+    if(fiul_asteptator==false){
+
+      string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+      int new_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if((write(new_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+        perror("ERORARE LA TIMEOUT!");
+        exit(EXIT_FAILURE);
+      }
+      close(new_fd);
+      return;
+    }
       printf("Operatia %s a avut loc!\n", my_command.return_path(nr_cmd));
       close(fd);
       if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
@@ -586,6 +635,12 @@ void exec_generic_cmd(Commandments my_command, int nr_cmd, string filename, stri
         remove(path.c_str());
      }
   }
+}
+
+else{
+  proceseaza_custom_cmd(my_command, nr_cmd, filename, special_cmd, filename);
+  remove(my_command.file_path().c_str());
+}
 
 
 
@@ -728,10 +783,10 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
 
   //printf("COMANDA1 ESTE: %s \n COMANDA2 ESTE: %s \n", cmd1, cmd2);
   pid_t proces;
-  pid_t  asteptare_fiu;
   string filenametemp = filename+"__temporary";
   int status;
   string path = cmd.file_path();
+
 
   int fd;
   int fd_err;
@@ -799,11 +854,16 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
       exit(EXIT_FAILURE);
   }
   lseek(fd, 0, SEEK_SET);
+
+  if(cmd.detect_custom_cmd(nr_cmd)=="N/A"){
+
+
   if((proces=fork())==-1){
       perror("EROARE LA FURCULITA!!");
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+      setpgid(0, 0);
       dup2(fd, 0);
       dup2(file_fd, 1);
       if(special_file==3){
@@ -822,8 +882,20 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
       exit(EXIT_FAILURE);
   }
   else{
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+    bool fiul_asteptator = timeout(proces, status, 5);
+    if(fiul_asteptator==false){
+
+      string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+      int new_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if((write(new_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+        perror("ERORARE LA TIMEOUT!");
+        exit(EXIT_FAILURE);
+      }
+      close(new_fd);
+      remove(path.c_str());
+      remove(filenametemp.c_str());
+      return;
+    }
       sync();
       close(fd);
       close(file_fd);
@@ -844,6 +916,19 @@ void pipeline(Commandments cmd, int nr_cmd, string filename, string input, int s
 
     }
   }
+}
+
+else{
+  proceseaza_custom_cmd(cmd, nr_cmd, filenametemp, special_file, input);
+  remove(path.c_str());
+  remove(filename.c_str());
+  if(rename(filenametemp.c_str(), filename.c_str()) == -1){
+    perror("EROARE LA RENAME!");
+    exit(EXIT_FAILURE);
+
+}
+
+}
 
 }
 
@@ -860,7 +945,7 @@ bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
   int fd;
   int fd_input;
   int fd_err;
-
+  if(cmd.detect_custom_cmd(nr_cmd)=="N/A"){
   printf("[DEBUG] special file = %d\n", special_file);
 
   if(special_file==1){
@@ -930,7 +1015,6 @@ bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
 
 
   pid_t proces;
-  pid_t  asteptare_fiu;
   int status;
 
   printf("fila: %s\n", path.c_str());
@@ -941,6 +1025,7 @@ bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+      setpgid(0, 0);
       if(special_file==2){
         dup2(fd_input, 0);
       }
@@ -967,8 +1052,19 @@ bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
       exit(EXIT_FAILURE);
   }
   else{
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+    bool fiul_asteptator = timeout(proces, status, 5);
+    if(fiul_asteptator==false){
+
+      string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+      int new_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      if((write(new_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+        perror("ERORARE LA TIMEOUT!");
+        exit(EXIT_FAILURE);
+      }
+      close(new_fd);
+      remove(path.c_str());
+      return false;
+    }
       sync();
       close(fd);
 
@@ -985,6 +1081,13 @@ bool AND_oftheworld(Commandments cmd, int nr_cmd, string filename, int special_f
   }
 
   return true;
+}
+
+else{
+  proceseaza_custom_cmd(cmd, nr_cmd, filename, special_file, output);
+  remove(path.c_str());
+  return false;
+}
 
 
 }
@@ -1002,8 +1105,9 @@ bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
   }
   close(file_exists);
 
+  if(cmd.detect_custom_cmd(nr_cmd)=="N/A"){
+
   pid_t proces;
-  pid_t  asteptare_fiu;
   int status;
 
   printf("fila: %s\n", path.c_str());
@@ -1084,6 +1188,7 @@ bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+    setpgid(0, 0);
     if(special_file==2){
       dup2(fd_input, 0);
       close(fd_input);
@@ -1107,8 +1212,19 @@ bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   else{
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+    bool fiul_asteptator = timeout(proces, status, 5);
+    if(fiul_asteptator==false){
+
+      string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+      int new_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      if((write(new_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+        perror("ERORARE LA TIMEOUT!");
+        exit(EXIT_FAILURE);
+      }
+      close(new_fd);
+      remove(path.c_str());
+      return false;
+    }
       sync();
       close(fd);
 
@@ -1125,7 +1241,12 @@ bool ORwell(Commandments cmd, int nr_cmd, string filename, int special_file, str
   }
 
   return true;
-
+  }
+  else{
+    proceseaza_custom_cmd(cmd, nr_cmd, filename, special_file, output);
+    remove(path.c_str());
+    return false;
+  }
 
 }
 
@@ -1135,9 +1256,9 @@ bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
 
   string path = cmd.file_path();
   pid_t proces;
-  pid_t  asteptare_fiu;
   int status;
 
+  if(cmd.detect_custom_cmd(nr_cmd)=="N/A"){
 
   int fd;
   int fd_input;
@@ -1214,6 +1335,7 @@ bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   if(proces==0){
+    setpgid(0, 0);
     if(special_file==2){
       dup2(fd_input, 0);
       close(fd_input);
@@ -1238,8 +1360,19 @@ bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
       exit(EXIT_FAILURE);
   }
   else{
-      asteptare_fiu = wait(&status);
-      if(asteptare_fiu==-1){perror("Eroare la asteptarea fiului1"); exit(EXIT_FAILURE);}
+    bool fiul_asteptator = timeout(proces, status, 5);
+    if(fiul_asteptator==false){
+
+      string timeout_msg = "Comanda nu s-a putut executa intr-un timp suficient\n";
+      int new_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      if((write(new_fd, timeout_msg.c_str(), timeout_msg.size()))==-1){
+        perror("ERORARE LA TIMEOUT!");
+        exit(EXIT_FAILURE);
+      }
+      close(new_fd);
+      remove(path.c_str());
+      return false;
+    }
       sync();
       close(fd);
 
@@ -1256,6 +1389,12 @@ bool DotCom(Commandments cmd, int nr_cmd, string filename, int special_file, str
   }
 
   return true;
+}
+else{
+  proceseaza_custom_cmd(cmd, nr_cmd, filename, special_file, output);
+  remove(path.c_str());
+  return false;
+}
 
 
 }
@@ -1329,8 +1468,64 @@ bool valid_output(string file)
 }
 
 bool proceseaza_custom_cmd(Commandments cmd, int nr_cmd ,string filename, int special_file, string output){
-  if(cmd.detect_custom_cmd(nr_cmd)=="cd"){
-   return(custom_cd(cmd.return_cmd_separat(nr_cmd), filename, special_file, output, cmd));
+  int fd_output, fd_err;
+  if(special_file==1){
+    fd_output = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666); //ok deci mesajul de eroare trebuie gandit astfel incat sa stiu ce sa fac in caz ca fila nu exista...
+    if(fd_output==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+      string no_permission = "Permission denied!";
+      if(fd_trunc==-1){
+        perror("EROARE! NU SE POATE DESCHIDE FILA ORIGINALA!!");
+        exit(EXIT_FAILURE);
+      }
+      if((write(fd_trunc, no_permission.c_str(), no_permission.size()))==-1){
+        perror("EROARE LA SCRIEREA PE FISIERUL ORIGINAL!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return true;
+    }
+  }
+  else{
+    fd_output = open(filename.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666); 
+    if(fd_output==-1){
+      perror("EROARE LA DESCHIDEREA FISIERULUI!!");
+      exit(EXIT_FAILURE);
+    }
+  }
+  if (special_file==3)
+  {
+    printf("[DEBUG] Avem input in pipeline, anume %s\n", output.c_str());
+    fd_err = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if(fd_err==-1){
+      int fd_trunc = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+      if(fd_trunc==-1){
+        perror("EROARE LA CREEREA TRUNCHIERII IN PIPELINE!!");
+        exit(EXIT_FAILURE);
+      }
+      string msg_err = "Permision denied!\n";
+      if((write(fd_trunc, msg_err.c_str(), msg_err.size()))==-1){
+        perror("EROARE LA TRANSMITEREA MESAJULUI DE EROARE!");
+        exit(EXIT_FAILURE);
+      }
+      close(fd_trunc);
+      return true;
+    }
+  }
+  if(cmd.detect_custom_cmd(nr_cmd)!="N/A"){
+    string refusal = "Nu aveti permisiunea de a folosi comanda " + cmd.detect_custom_cmd(nr_cmd) + "!\n";
+    if(special_file==3){
+      if((write(fd_err, refusal.c_str(), refusal.size()))==-1){
+        perror("EROARE LA TRANSMITEREA MESAJULUI!");
+        exit(EXIT_FAILURE);
+      }
+    }
+    else{
+      if((write(fd_output, refusal.c_str(), refusal.size()))==-1){
+        perror("EROARE LA TRANSMITEREA MESAJULUI!");
+        exit(EXIT_FAILURE);
+      }
+    }
 
   }
   return false;

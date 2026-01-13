@@ -439,6 +439,23 @@ void my_windows::scrollup(int window)
 
 }
 
+void my_windows::return_back(int window)
+{
+  if((current_pos[window]==(int)Window_History[window].size()) || ((int)Window_History[window].size()<=getmaxy(inside_box[window]))){
+    return;
+  }
+  else{
+    int start = (int)Window_History[window].size() - last_pos[window];
+    for(int i=0;i<getmaxy(inside_box[window]);i++){
+
+      if(start+i>=(int)Window_History[window].size()){
+        break;
+      }
+        wprintw(inside_box[window], "%s", Window_History[window][start+i].c_str());
+      }
+    }
+}
+
 void my_windows::scrolldown(int window)
 {
 

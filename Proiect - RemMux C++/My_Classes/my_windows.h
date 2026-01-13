@@ -64,9 +64,11 @@ class my_windows{
     void RestoreWindow(int position);
     void CreateWindowHistory(int position, string& msg);
     void scrollup(int window);
+    void return_back(int window);
     void scrolldown(int window);
     void log_history(string &msg);
     void resize_win();
+
 
 
 

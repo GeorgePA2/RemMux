@@ -138,7 +138,7 @@ void Commandments::creeate_path(string file, string absolute_path)
 
 string Commandments::detect_custom_cmd(int nr_cmd)
 {
-  vector<string> Comenzi_Custom = {"cd"};
+  vector<string> Comenzi_Custom = {"cd", "nano", "sudo", "history", "vi", "vim", "emacs", "top", "htop", "less", "more", "mc", "ranger", "tmux", "screen"};
 
   for(int i=0;i<(int)Comenzi_Custom.size();i++){
     long unsigned int gasit = this->Commands[nr_cmd-1].find(Comenzi_Custom[i], 0);

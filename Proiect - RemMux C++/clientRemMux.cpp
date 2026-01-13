@@ -81,6 +81,7 @@ int main (int argc, char *argv[])
   switch (key){
 
     case 10:
+      active_windows.return_back(active_windows.Get_CurrentW());
       echo();
       while(true){
         log_history(log_updates = "Clientul tasteaza\n");
@@ -272,7 +273,6 @@ int procesare_client(int argc, char *argv[], int &connected, my_windows& win){
       log_history(msg = "[client]Eroare la write() spre server.\n");
       return -1;
     }
-
 
   if (read (sd, &nr,sizeof(int)) < 0)
     {
