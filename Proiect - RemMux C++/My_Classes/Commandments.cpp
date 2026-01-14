@@ -24,6 +24,7 @@ vector<string> separate_inside(string cmd);
 Commandments::Commandments(const char *cmd)
 {
     this->succes_path = "/Success/";
+    mkdir("Success", 0777);
     this->total_commands = 0;
     string cmd_str;
     info_operatii op_info = op_type(cmd, 0);

@@ -56,7 +56,6 @@ int my_windows::return_current_line(int window)
 
 int my_windows::return_totalLines(int window)
 {
-  enable_log_history = true;
   int line_count = 0;
 
   int i =0;
@@ -120,7 +119,7 @@ my_windows::my_windows()
     this->windows_opened = 1;
     this->current_window = 0;
     this->max_size = 6;
-    this->enable_log_history = true;
+    this->enable_log_history = false;
   
     wmove(innernew_window, 0, 0);
     wprintw(inside_box[current_window], "Press <<Enter>> to start typing, '+' to create a new window <<tab>> to switch between windows or 'q' to quit!\n");
@@ -519,6 +518,7 @@ this->last_pos[window] = getcury(inside_box[window]);
 
 void my_windows::log_history(string &msg)
 {
+    if(enable_log_history){
     int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
     if(fd==-1){
         //perror("EROARE LA DESCHIDEREA FISIERULUI!");
@@ -529,6 +529,7 @@ void my_windows::log_history(string &msg)
     }
     msg.clear();
     close(fd);    
+  }
   
 }
 
@@ -569,7 +570,6 @@ void my_windows::resize_win()
 
   int start_x = 0;
   int start_y = 0;
-  this->enable_log_history = false;
   //log_history(rsz="INcepem\n");
   for(int i=0;i<prev_wincount;i++){
     //log_history(rsz="Am putut face redimensionarea\n");
@@ -584,7 +584,6 @@ void my_windows::resize_win()
     Create_Window(getmaxy(stdscr) * this->ratios[i].h_ratio, getmaxx(stdscr) * this->ratios[i].l_ratio, start_y, start_x);
     RestoreWindow(i);
     this->last_pos[i] = getcury(inside_box[i]);
-    this->enable_log_history = true;
     log_history(rsz = "ultima linie: " + to_string(current_pos[i]) + "\n");
     log_history(rsz = "Numarul total de caractere la fereastra:" + to_string(i)  + "este " + to_string(total_chars[i]) + "\n");
     log_history(rsz = "Numarul total de linii curent:" + to_string(total_lines[i]) + "\n");
@@ -605,7 +604,6 @@ void my_windows::resize_win()
   doupdate();
   
   refresh();
-  this->enable_log_history = true;
   //log_history(rsz);
 
 }

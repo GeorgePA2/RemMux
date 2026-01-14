@@ -29,14 +29,11 @@ extern int errno;
 
 
 int port;
-
+bool enable_log_history = true;
 
 typedef struct Protocol_Client
 {
-
   int(*procesare_cl)(int arc, char* argv[], int &status, my_windows& wind);
-
-  void(*curatenie_de_primavara)(void);
 }Protocol_Client;
 
 
@@ -49,15 +46,9 @@ typedef struct Protocol_Client
 
 
 void log_history(string &msg);
- int procesare_client(int argc, char *argv[], int &connected, my_windows& win);
-
- void cleanup();
-
+int procesare_client(int argc, char *argv[], int &connected, my_windows& win);
 Protocol_Client My_Client{
-
-  .procesare_cl = procesare_client,
-
-  .curatenie_de_primavara = cleanup
+  .procesare_cl = procesare_client
 };
 
 int main (int argc, char *argv[])
@@ -69,7 +60,6 @@ int main (int argc, char *argv[])
   remove("my_logs");
   string log_updates;
   int key='i';
-  My_Client.curatenie_de_primavara();
   my_windows active_windows;
   string msg;
   while((key != 'q') && (key !='Q')){
@@ -95,12 +85,14 @@ int main (int argc, char *argv[])
         wprintw(active_windows.Get_CurrentWindow(),"[Client] Do you want continue? y/n\n");
         active_windows.CreateWindowHistory(active_windows.Get_CurrentW(), msg = "[Client] Do you want continue? y/n\n");
         wrefresh(active_windows.Get_CurrentWindow());
-        while((key!='y') && (key!='Y') && (key!='n') && (key!='N')){
+        while((key!='y') && (key!='Y') && (key!='n') && (key!='N') && (key!='q') && (key!='Q')){
           
           if (key==KEY_RESIZE){
             active_windows.resize_win();
             log_history(log_updates="resizing...\n");
            }
+          
+
 
           noecho();
           key = wgetch(active_windows.Get_CurrentWindow());
@@ -108,6 +100,10 @@ int main (int argc, char *argv[])
         }
         if((key=='n') || (key=='N')){
           log_history(log_updates = "Am ales sa nu mai continui!\n");
+          break;
+        }
+        if(key=='q' || key=='Q'){
+          log_history(log_updates = "Rage quit!\n");
           break;
         }
         else{
@@ -131,6 +127,11 @@ int main (int argc, char *argv[])
     wrefresh(active_windows.Get_CurrentWindow());
     break;
   case '=':
+    active_windows.Add_Window();
+    log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string(active_windows.Get_nrWindows()) + "\n");
+    break;
+
+  case '+':
     active_windows.Add_Window();
     log_history(log_updates = "Am creat o fereastra noua, cu numarul " + to_string(active_windows.Get_nrWindows()) + "\n");
     break;
@@ -160,11 +161,11 @@ int main (int argc, char *argv[])
     break;
   }
 }
-  My_Client.curatenie_de_primavara();
   endwin();
 }
 
 void log_history(string &msg){
+  if(enable_log_history){
   int fd = open("./my_logs", O_RDWR | O_CREAT | O_APPEND, 0666);
   if(fd==-1){
     perror("EROARE LA DESCHIDEREA FISIERULUI!");
@@ -176,6 +177,7 @@ void log_history(string &msg){
   msg.clear();
   close(fd);
 }
+}
 
 int procesare_client(int argc, char *argv[], int &connected, my_windows& win){
   int sd;			
@@ -184,12 +186,13 @@ int procesare_client(int argc, char *argv[], int &connected, my_windows& win){
   int nr=0;
   string msg;
   char buf[4096];
+  int chunk = 1000;
 
   if (argc != 3)
     {
       string argv_zero;
       argv_zero.assign(argv[0], argv[0] + strlen(argv[0]));
-      msg = "Sintaxa: " + argv_zero  + "<adresa_server> <port>\n";
+      msg = "Server inexistent. Asigurati-va ca folositi sintaxa: " + argv_zero  + "<adresa_server> <port>\n. Va recomandam sa va reconectati";
       argv_zero.clear();
       win.CreateWindowHistory(win.Get_CurrentW(), msg);
       wprintw(win.Get_CurrentWindow(), "%s", msg.c_str());
@@ -285,35 +288,51 @@ int procesare_client(int argc, char *argv[], int &connected, my_windows& win){
     log_history(msg);
   }
 
-  char raspuns[nr+1];
+  char* raspuns = (char*) malloc(nr+1);
   signal(SIGPIPE, SIG_IGN);
+
+
   if (read (sd, raspuns,nr) < 0)
     {
-     
+      free(raspuns);
       log_history(msg = "[client]Eroare la read() de la server.\n");
       return -1;
     }
   raspuns[nr] = '\0';
   signal(SIGPIPE, SIG_IGN);
 
-  
-  wprintw (win.Get_CurrentWindow(),"[Server]%s", raspuns);
   string temp = raspuns;
-  msg = "[Server] " + temp;
-  temp.clear();
+  msg = "[Server] " + temp + "\n";
+  log_history(temp = "Mesajul este: " + msg);
+  
+  if((int)msg.size()<chunk){
+  wprintw (win.Get_CurrentWindow(),"%s", msg.c_str());
+  }
+  else{
+    int content_left = (int)msg.size();
+    int msg_len = chunk;
+    int start = 0;
+    while(content_left>0){
+      if(content_left < msg_len){
+        msg_len = content_left;
+      }
+      string bucata = msg.substr(start, msg_len);
+      wprintw (win.Get_CurrentWindow(),"%s", bucata.c_str());
+      content_left -= msg_len;
+      start += msg_len;
+
+    }
+  }
   win.CreateWindowHistory(win.Get_CurrentW(), msg);
-  log_history(msg);
   wrefresh(win.Get_CurrentWindow());
+
+
 
   
   close (sd);
-  return 1;
-}
 
-void cleanup(){
-  string file_history;
-  for(int i=0;i<=10;i++){
-    file_history = "./Client_logs/window" + to_string(i);
-    remove(file_history.c_str());
-  }
+  temp.clear();
+  msg.clear();
+  free(raspuns);
+  return 1;
 }
